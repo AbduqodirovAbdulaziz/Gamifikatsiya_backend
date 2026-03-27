@@ -1,0 +1,21 @@
+# Render.com Blueprint
+# Auto-deploy uchun bu fayl Render da "Blueprint" sifatida import qilinadi
+
+services:
+  - type: web
+    name: edugame-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements/base.txt
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    healthCheckPath: /api/v1/auth/login/
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "edugame-api.onrender.com,localhost"

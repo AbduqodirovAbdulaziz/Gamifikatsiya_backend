@@ -1,0 +1,2 @@
+# EduGame Backend Apps
+default_app_config = "apps.users.apps.UsersConfig"
