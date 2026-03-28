@@ -1,5 +1,6 @@
+import 'package:edugame/core/constants/app_colors.dart';
+import 'package:edugame/core/constants/app_constants.dart' hide AppColors;
 import 'package:flutter/material.dart';
-import '../constants/app_constants.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
@@ -8,15 +9,13 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.background,
-
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         error: AppColors.error,
         surface: AppColors.surface,
       ),
-
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -27,15 +26,13 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: AppSizes.cardElevation,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusM),
         ),
         color: AppColors.cardBackground,
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -47,7 +44,6 @@ class AppTheme {
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
-
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
@@ -58,11 +54,9 @@ class AppTheme {
           ),
         ),
       ),
-
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.primary),
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
@@ -88,7 +82,6 @@ class AppTheme {
         ),
         hintStyle: const TextStyle(color: AppColors.textHint),
       ),
-
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.primary,
@@ -96,7 +89,6 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
-
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
@@ -136,12 +128,10 @@ class AppTheme {
           color: AppColors.textPrimary,
         ),
       ),
-
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
       ),
-
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.textPrimary,
         contentTextStyle: const TextStyle(color: Colors.white),

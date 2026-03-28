@@ -19,6 +19,12 @@ from .serializers import (
 from apps.quizzes.models import QuizAttempt
 
 
+def check_challenge_access(challenge, user):
+    if user.role == "admin" or user.is_staff:
+        return True
+    return challenge.challenger == user or challenge.opponent == user
+
+
 class TournamentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -242,7 +248,19 @@ class ChallengeViewSet(viewsets.ModelViewSet):
         user = request.user
         score = request.data.get("score", 0)
 
-        if challenge.status not in ["pending", "accepted", "in_progress"]:
+        if score < 0:
+            return Response(
+                {"error": "Score manfiy bo'lishi mumkin emas"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if challenge.expires_at and timezone.now() > challenge.expires_at:
+            return Response(
+                {"error": "Challenge muddati o'tgan"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if challenge.status == "completed":
             return Response(
                 {"error": "Challenge yakunlangan"}, status=status.HTTP_400_BAD_REQUEST
             )
@@ -268,6 +286,8 @@ class ChallengeViewSet(viewsets.ModelViewSet):
                 challenge.winner = challenge.challenger
             elif challenge.opponent_score > challenge.challenger_score:
                 challenge.winner = challenge.opponent
+            else:
+                challenge.winner = None
 
             challenge.status = "completed"
             challenge.completed_at = timezone.now()
@@ -275,12 +295,13 @@ class ChallengeViewSet(viewsets.ModelViewSet):
 
             from apps.gamification.services import GamificationService
 
-            GamificationService.award_xp(
-                challenge.winner.id,
-                challenge.xp_stake,
-                "challenge_win",
-                f"Challenge g'alabasi",
-            )
+            if challenge.winner:
+                GamificationService.award_xp(
+                    challenge.winner.id,
+                    challenge.xp_stake,
+                    "challenge_win",
+                    f"Challenge g'alabasi",
+                )
 
         return Response(
             {

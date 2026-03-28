@@ -20,7 +20,6 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
   Map<String, dynamic>? _gamificationData;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,13 +34,12 @@ class _DashboardPageState extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           _gamificationData = response.data;
-          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _gamificationData = null;
         });
       }
     }
@@ -152,7 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context, state) {
         String name = 'Foydalanuvchi';
         if (state is AuthAuthenticated) {
-          name = state.user.username ?? 'Foydalanuvchi';
+          name = state.user.username;
         }
         return Container(
           padding: const EdgeInsets.all(20),

@@ -13,9 +13,54 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.room_group_name = f"chat_{self.room_id}"
 
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        user = await self.get_user_from_token()
+        if not user:
+            await self.close()
+            return
 
+        is_authorized = await self.verify_room_access(user)
+        if not is_authorized:
+            await self.close()
+            return
+
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    @database_sync_to_async
+    def get_user_from_token(self):
+        try:
+            query_string = self.scope.get("query_string", b"").decode()
+            params = dict(p.split("=") for p in query_string.split("&") if "=" in p)
+            token = params.get("token", "")
+            if not token:
+                return None
+            access_token = AccessToken(token)
+            user_id = access_token["user_id"]
+            return User.objects.get(id=user_id)
+        except Exception:
+            return None
+
+    @database_sync_to_async
+    def verify_room_access(self, user):
+        from apps.chat.models import ChatRoom
+
+        try:
+            room = ChatRoom.objects.get(id=self.room_id)
+            if room.room_type == "classroom":
+                from apps.classroom.models import Enrollment
+
+                return (
+                    Enrollment.objects.filter(
+                        student=user, classroom=room.classroom, is_active=True
+                    ).exists()
+                    or room.classroom.teacher == user
+                )
+            return True
+        except ChatRoom.DoesNotExist:
+            return False
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)

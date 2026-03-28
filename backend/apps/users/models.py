@@ -24,8 +24,8 @@ class CustomUser(AbstractUser):
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(null=True, blank=True)
 
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["username"]
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = ["email"]
 
     class Meta:
         db_table = "users_customuser"
@@ -33,7 +33,7 @@ class CustomUser(AbstractUser):
         verbose_name_plural = "Foydalanuvchilar"
 
     def __str__(self):
-        return f"{self.email} ({self.role})"
+        return f"{self.username} ({self.role})"
 
 
 class StudentProfile(models.Model):
@@ -61,8 +61,10 @@ class StudentProfile(models.Model):
         return f"{self.user.username} - Level {self.level}"
 
     def save(self, *args, **kwargs):
-        if self.xp_points and self.level == 1:
-            self.level = self.calculate_level()
+        if self.xp_points is not None and self.level == 1:
+            self.level = self.calculate_level(self.xp_points)
+        elif self.xp_points is not None:
+            self.level = self.calculate_level(self.xp_points)
         super().save(*args, **kwargs)
 
     @staticmethod

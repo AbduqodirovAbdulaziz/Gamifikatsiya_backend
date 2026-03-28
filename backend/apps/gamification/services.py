@@ -45,7 +45,6 @@ class GamificationService:
         GamificationService.update_leaderboard(user_id, amount)
 
         level_up = profile.level > old_level
-        new_badges = []
 
         if level_up:
             level_title = GamificationService.get_level_title(profile.level)
@@ -53,7 +52,9 @@ class GamificationService:
                 user_id, "level_up", {"level": profile.level}
             )
 
-        GamificationService.check_and_award_badges(user_id, transaction_type)
+        new_badges = GamificationService.check_and_award_badges(
+            user_id, transaction_type
+        )
 
         return {
             "xp_earned": amount,

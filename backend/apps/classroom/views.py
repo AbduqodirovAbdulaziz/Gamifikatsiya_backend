@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -39,14 +40,30 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(teacher=self.request.user)
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
+        from rest_framework.pagination import PageNumberPagination
+
         query = request.query_params.get("q", "")
-        classrooms = Classroom.objects.filter(
-            is_active=True, name__icontains=query
-        ) | Classroom.objects.filter(is_active=True, subject__icontains=query)
-        serializer = self.get_serializer(classrooms.distinct()[:20], many=True)
-        return Response(serializer.data)
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 20))
+
+        page_size = min(page_size, 50)
+
+        queryset = (
+            Classroom.objects.filter(is_active=True)
+            .filter(
+                models.Q(name__icontains=query) | models.Q(subject__icontains=query)
+            )
+            .distinct()
+        )
+
+        paginator = PageNumberPagination()
+        paginator.page_size = page_size
+        paginated = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(paginated, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
 
     @action(detail=False, methods=["post"])
     def join(self, request):
@@ -111,19 +128,32 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["delete"])
     def remove_student(self, request, pk=None):
         classroom = self.get_object()
+        user = request.user
 
-        if classroom.teacher != request.user:
+        if classroom.teacher != user and not user.is_staff:
             return Response(
                 {"error": "Faqat sinf rahbari o'quvchini chiqarishi mumkin"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         student_id = request.data.get("student_id")
-        enrollment = get_object_or_404(
-            Enrollment, student_id=student_id, classroom=classroom
-        )
-        enrollment.is_active = False
-        enrollment.save()
+        if not student_id:
+            return Response(
+                {"error": "student_id talab qilinadi"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            enrollment = Enrollment.objects.get(
+                student_id=student_id, classroom=classroom
+            )
+            enrollment.is_active = False
+            enrollment.save()
+        except Enrollment.DoesNotExist:
+            return Response(
+                {"error": "Bu o'quvchi sinfхонада topilmadi"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         return Response({"message": "O'quvchi chiqarildi"})
 

@@ -9,6 +9,13 @@ class AnswerChoiceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class AnswerChoiceSerializerForStudent(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerChoice
+        fields = ["id", "choice_text", "order"]
+        read_only_fields = ["id"]
+
+
 class QuestionSerializer(serializers.ModelSerializer):
     choices = AnswerChoiceSerializer(many=True, read_only=True)
 
@@ -22,7 +29,25 @@ class QuestionSerializer(serializers.ModelSerializer):
             "difficulty",
             "points",
             "time_limit_seconds",
-            "explanation",
+            "order",
+            "choices",
+        ]
+        read_only_fields = ["id", "explanation"]
+
+
+class QuestionSerializerForStudent(serializers.ModelSerializer):
+    choices = AnswerChoiceSerializerForStudent(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        fields = [
+            "id",
+            "question_text",
+            "question_type",
+            "image",
+            "difficulty",
+            "points",
+            "time_limit_seconds",
             "order",
             "choices",
         ]
@@ -242,5 +267,7 @@ class QuizStartSerializer(serializers.Serializer):
 
 
 class QuizSubmitSerializer(serializers.Serializer):
-    answers = serializers.ListField(child=serializers.DictField(), allow_empty=True)
-    time_taken_seconds = serializers.IntegerField()
+    answers = serializers.ListField(
+        child=serializers.DictField(), allow_empty=True, max_length=100
+    )
+    time_taken_seconds = serializers.IntegerField(min_value=0, max_value=7200)

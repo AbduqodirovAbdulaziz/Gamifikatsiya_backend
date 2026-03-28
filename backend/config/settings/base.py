@@ -13,6 +13,7 @@ DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
+    "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -68,18 +69,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# PostgreSQL for Render (or SQLite for local)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
-# Uncomment for PostgreSQL on Render:
-# if os.environ.get("DATABASE_URL"):
-#     import dj_database_url
-#     DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 AUTH_USER_MODEL = "users.CustomUser"
 
@@ -99,9 +94,17 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES = [
-    "whitenoise.storage.CompressedManifestStaticFilesStorage",
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
 ]
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -143,7 +146,6 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 
-# CORS - Render URL ni qo'shing
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -162,6 +164,100 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
-# Celery (optional - Render da background jobs uchun)
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TIMEZONE = TIME_ZONE
+
+# ═══════════════════════════════════════════════════════════
+# JAZZMIN — Deep Navy #0F2854 premium tema
+# ═══════════════════════════════════════════════════════════
+JAZZMIN_SETTINGS = {
+    "site_title": "EduGame Admin",
+    "site_header": "EduGame",
+    "site_brand": "EduGame",
+    "welcome_sign": "EduGame boshqaruv paneliga xush kelibsiz!",
+    "copyright": "EduGame",
+    "user_avatar": None,
+    "topmenu_links": [
+        {"name": "Dashboard", "url": "admin:index", "icon": "fas fa-home"},
+        {
+            "name": "API Docs",
+            "url": "/api/docs/",
+            "icon": "fas fa-book",
+            "new_window": True,
+        },
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": ["apps.notifications"],
+    "show_ui_builder": False,
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        "users.CustomUser": "fas fa-user-shield",
+        "users.StudentProfile": "fas fa-user-graduate",
+        "users.TeacherProfile": "fas fa-chalkboard-teacher",
+        "courses.Course": "fas fa-book",
+        "courses.Lesson": "fas fa-chalkboard",
+        "courses.LessonProgress": "fas fa-tasks",
+        "courses.CourseCompletion": "fas fa-certificate",
+        "quizzes.Quiz": "fas fa-question-circle",
+        "quizzes.Question": "fas fa-align-left",
+        "quizzes.AnswerChoice": "fas fa-check-square",
+        "quizzes.QuizAttempt": "fas fa-history",
+        "quizzes.StudentAnswer": "fas fa-pen",
+        "gamification.Badge": "fas fa-medal",
+        "gamification.UserBadge": "fas fa-user-tag",
+        "gamification.XPTransaction": "fas fa-coins",
+        "gamification.LeaderboardEntry": "fas fa-trophy",
+        "gamification.Streak": "fas fa-fire",
+        "gamification.DailyQuest": "fas fa-calendar-check",
+        "gamification.LevelTitle": "fas fa-star",
+        "competition.Tournament": "fas fa-gamepad",
+        "competition.TournamentParticipant": "fas fa-handshake",
+        "competition.Challenge": "fas fa-bolt",
+        "competition.ChallengeAttempt": "fas fa-running",
+        "classroom.Classroom": "fas fa-school",
+        "classroom.Enrollment": "fas fa-id-card",
+        "classroom.ClassroomInvitation": "fas fa-envelope-open-text",
+        "notifications.Notification": "fas fa-bell",
+        "notifications.PushNotificationLog": "fas fa-clipboard-list",
+        "chat.ChatRoom": "fas fa-comments",
+        "chat.Message": "fas fa-comment-alt",
+        "chat.MessageReaction": "fas fa-smile",
+    },
+}
+
+# ═══════════════════════════════════════════════════════════
+# Jazzmin UI Tweaklar
+# ═══════════════════════════════════════════════════════════
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": True,
+    "brand_small_text": False,
+    "brand_colour": "navbar-dark",
+    "navbar": "navbar-dark",
+    "no_navbar_border": True,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "flatly",
+    "dark_mode_theme": None,
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-outline-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
+    },
+}

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../gamification/data/repositories/gamification_repository.dart';
+import '../../data/repositories/gamification_repository.dart';
 import '../../../../core/constants/app_constants.dart';
 
 class XPBarWidget extends StatelessWidget {
@@ -93,7 +93,7 @@ class StreakWidget extends StatelessWidget {
 }
 
 class BadgeWidget extends StatelessWidget {
-  final Badge badge;
+  final GameBadge badge;
   final bool showName;
 
   const BadgeWidget({super.key, required this.badge, this.showName = true});

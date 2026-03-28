@@ -23,17 +23,33 @@ class CourseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == "teacher":
-            return Course.objects.filter(teacher=user)
-        return Course.objects.filter(
-            is_published=True,
-            classroom__enrollments__student=user,
-            classroom__enrollments__is_active=True,
-        ).distinct()
+            queryset = Course.objects.filter(teacher=user)
+        else:
+            queryset = Course.objects.filter(
+                is_published=True,
+                classroom__enrollments__student=user,
+                classroom__enrollments__is_active=True,
+            ).distinct()
+
+        queryset = queryset.prefetch_related("lessons")
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "list":
             return CourseListSerializer
         return CourseSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        user = self.request.user if self.request else None
+        if user and user.is_authenticated:
+            from django.db.models import Prefetch
+            from apps.courses.models import LessonProgress
+
+            context["lessons_progress"] = {
+                lp.lesson_id: lp for lp in LessonProgress.objects.filter(student=user)
+            }
+        return context
 
     def perform_create(self, serializer):
         classroom_id = self.request.data.get("classroom_id")
@@ -45,7 +61,30 @@ class CourseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def lessons(self, request, pk=None):
         course = self.get_object()
-        lessons = course.lessons.filter(is_published=True).order_by("order")
+        lessons = (
+            course.lessons.filter(is_published=True)
+            .order_by("order")
+            .prefetch_related("progress")
+        )
+
+        lesson_ids = list(lessons.values_list("id", flat=True))
+        progress_map = {}
+        if request.user.is_authenticated:
+            from apps.courses.models import LessonProgress
+
+            progress_map = {
+                lp.lesson_id: lp
+                for lp in LessonProgress.objects.filter(
+                    student=request.user, lesson_id__in=lesson_ids
+                )
+            }
+
+        for lesson in lessons:
+            if lesson.id in progress_map:
+                progress = progress_map[lesson.id]
+                lesson._is_completed_cache = progress.is_completed
+                lesson._progress_percentage_cache = progress.progress_percentage
+
         serializer = LessonSerializer(lessons, many=True, context={"request": request})
         return Response(serializer.data)
 
@@ -92,6 +131,7 @@ class LessonViewSet(viewsets.ModelViewSet):
             student=user, lesson=lesson, defaults={"progress_percentage": 100}
         )
 
+        xp_earned = 0
         if not progress.is_completed:
             progress.is_completed = True
             progress.completed_at = timezone.now()
@@ -100,21 +140,56 @@ class LessonViewSet(viewsets.ModelViewSet):
 
             from apps.gamification.services import GamificationService
 
-            GamificationService.award_xp(
+            xp_result = GamificationService.award_xp(
                 user.id,
                 lesson.xp_reward,
                 "lesson_complete",
                 f"Dars yakunlandi: {lesson.title}",
                 related_id=str(lesson.id),
             )
+            xp_earned = xp_result.get("xp_earned", 0) if xp_result else 0
+
+            self._check_course_completion(user, lesson.course)
 
         return Response(
             {
                 "message": "Dars muvaffaqiyatli yakunlandi",
-                "xp_earned": lesson.xp_reward if not created else 0,
+                "xp_earned": xp_earned,
                 "is_completed": progress.is_completed,
             }
         )
+
+    def _check_course_completion(self, user, course):
+        completed_lessons = LessonProgress.objects.filter(
+            student=user,
+            lesson__course=course,
+            lesson__is_published=True,
+            is_completed=True,
+        ).count()
+
+        total_lessons = course.lessons.filter(is_published=True).count()
+
+        if completed_lessons >= total_lessons and total_lessons > 0:
+            existing = CourseCompletion.objects.filter(
+                student=user, course=course
+            ).exists()
+            if not existing:
+                CourseCompletion.objects.create(
+                    student=user,
+                    course=course,
+                    xp_earned=course.xp_reward,
+                    coin_earned=course.coin_reward,
+                )
+
+                from apps.gamification.services import GamificationService
+
+                GamificationService.award_xp(
+                    user.id,
+                    course.xp_reward,
+                    "course_complete",
+                    f"Kurs yakunlandi: {course.title}",
+                    related_id=str(course.id),
+                )
 
     @action(detail=True, methods=["post"])
     def update_progress(self, request, pk=None):

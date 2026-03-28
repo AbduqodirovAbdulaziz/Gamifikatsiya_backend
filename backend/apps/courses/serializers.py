@@ -27,12 +27,16 @@ class LessonSerializer(serializers.ModelSerializer):
         ]
 
     def get_is_completed(self, obj):
+        if hasattr(obj, "_is_completed_cache"):
+            return obj._is_completed_cache
         user = self.context.get("request").user if self.context.get("request") else None
         if user and user.is_authenticated:
             return obj.progress.filter(student=user, is_completed=True).exists()
         return False
 
     def get_progress_percentage(self, obj):
+        if hasattr(obj, "_progress_percentage_cache"):
+            return obj._progress_percentage_cache
         user = self.context.get("request").user if self.context.get("request") else None
         if user and user.is_authenticated:
             progress = obj.progress.filter(student=user).first()

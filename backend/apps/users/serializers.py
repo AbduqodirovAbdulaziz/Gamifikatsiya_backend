@@ -29,9 +29,22 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password = serializers.CharField(
+        write_only=True,
+        validators=[validate_password],
+        min_length=8,
+        error_messages={
+            "min_length": "Parol kamida 8 ta belgidan iborat bo'lishi kerak"
+        },
+    )
     password_confirm = serializers.CharField(write_only=True)
-    role = serializers.ChoiceField(choices=["student", "teacher"], default="student")
+    role = serializers.ChoiceField(
+        choices=["student", "teacher"],
+        default="student",
+        error_messages={
+            "invalid_choice": "Role faqat 'student' yoki 'teacher' bo'lishi mumkin"
+        },
+    )
 
     class Meta:
         model = User
@@ -44,6 +57,24 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
         ]
+        extra_kwargs = {
+            "email": {"required": True},
+            "username": {"required": True, "min_length": 3},
+        }
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Bu email allaqachon ro'yxatdan o'tgan")
+        return value.lower()
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Bu username allaqachon band")
+        if not value.isalnum():
+            raise serializers.ValidationError(
+                "Username faqat harflar va raqamlardan iborat bo'lishi kerak"
+            )
+        return value
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
@@ -91,11 +122,20 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
-    student_profile = StudentProfileSerializer(read_only=True)
+    student_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id", "username", "avatar", "role", "student_profile"]
+
+    def get_student_profile(self, obj):
+        if hasattr(obj, "student_profile"):
+            profile = obj.student_profile
+            return {
+                "level": profile.level,
+                "xp_points": profile.xp_points,
+            }
+        return None
 
 
 class UserProfileUpdateSerializer(serializers.ModelSerializer):

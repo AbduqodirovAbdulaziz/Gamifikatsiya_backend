@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../gamification/data/repositories/gamification_repository.dart';
+import '../../data/repositories/gamification_repository.dart';
 
 class BadgeWidget extends StatelessWidget {
-  final Badge badge;
+  final GameBadge badge;
 
   const BadgeWidget({super.key, required this.badge});
 

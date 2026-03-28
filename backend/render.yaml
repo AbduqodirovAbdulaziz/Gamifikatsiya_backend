@@ -7,15 +7,50 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements/base.txt
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    buildCommand: pip install -r requirements.txt
+    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
     healthCheckPath: /api/v1/auth/login/
+    runtime: python312
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: edugame-redis
+          envVarKey: REDIS_URL
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
       - key: ALLOWED_HOSTS
         value: "edugame-api.onrender.com,localhost"
+      - key: DJANGO_SETTINGS_MODULE
+        value: "config.settings.production"
+
+  - type: worker
+    name: edugame-celery
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A config worker -l info
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: edugame-redis
+          envVarKey: REDIS_URL
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DJANGO_SETTINGS_MODULE
+        value: "config.settings.production"
+
+  - type: redis
+    name: edugame-redis
+    plan: free
+    ipAllowList: []

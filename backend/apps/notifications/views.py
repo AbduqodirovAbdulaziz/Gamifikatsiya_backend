@@ -52,7 +52,16 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user)
+        user = self.request.user
+        if user.role == "admin" or user.is_staff:
+            return Notification.objects.all()
+        return Notification.objects.filter(recipient=user)
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method not in ["GET", "HEAD", "OPTIONS"]:
+            if obj.recipient != request.user and not request.user.is_staff:
+                self.permission_denied(request)
 
     @action(detail=False, methods=["get"])
     def unread_count(self, request):

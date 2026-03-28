@@ -14,13 +14,13 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -28,11 +28,11 @@ class _LoginPageState extends State<LoginPage> {
   void _onLogin() {
     if (_formKey.currentState!.validate()) {
       context.read<AuthBloc>().add(
-        AuthLoginRequested(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        ),
-      );
+            AuthLoginRequested(
+              username: _usernameController.text.trim(),
+              password: _passwordController.text,
+            ),
+          );
     }
   }
 
@@ -65,9 +65,9 @@ class _LoginPageState extends State<LoginPage> {
                     Text(
                       AppStrings.appName,
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: AppSizes.paddingS),
@@ -83,18 +83,15 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: AppSizes.paddingL),
                     TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _usernameController,
+                      keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
-                        labelText: AppStrings.email,
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.person_outlined),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Email kiritilmadi';
-                        }
-                        if (!value.contains('@')) {
-                          return 'To\'g\'ri email kiriting';
+                          return 'Username kiritilmadi';
                         }
                         return null;
                       },

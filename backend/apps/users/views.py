@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 
@@ -20,6 +22,38 @@ from .serializers import (
 from .permissions import IsOwner
 
 User = get_user_model()
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        username = attrs.get("username") or attrs.get("email")
+        password = attrs.get("password")
+
+        if not username or not password:
+            raise InvalidToken("Username va parol talab qilinadi")
+
+        user = User.objects.filter(username=username).first()
+
+        if not user:
+            raise InvalidToken("Username yoki parol noto'g'ri")
+
+        if not user.check_password(password):
+            raise InvalidToken("Username yoki parol noto'g'ri")
+
+        if not user.is_active:
+            raise InvalidToken("Bu foydalanuvchi faol emas")
+
+        refresh = self.get_token(user)
+
+        return {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        }
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 
 class RegisterView(generics.CreateAPIView):

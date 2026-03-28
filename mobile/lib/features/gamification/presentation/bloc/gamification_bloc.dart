@@ -38,7 +38,7 @@ class GamificationLoading extends GamificationState {}
 
 class GamificationLoaded extends GamificationState {
   final GamificationProfile profile;
-  final List<Badge> earnedBadges;
+  final List<GameBadge> earnedBadges;
   final List<DailyQuest> dailyQuests;
   final LeaderboardResponse? leaderboard;
   final bool bonusClaimed;
@@ -55,7 +55,7 @@ class GamificationLoaded extends GamificationState {
 
   GamificationLoaded copyWith({
     GamificationProfile? profile,
-    List<Badge>? earnedBadges,
+    List<GameBadge>? earnedBadges,
     List<DailyQuest>? dailyQuests,
     LeaderboardResponse? leaderboard,
     bool? bonusClaimed,
@@ -73,12 +73,12 @@ class GamificationLoaded extends GamificationState {
 
   @override
   List<Object?> get props => [
-    profile,
-    earnedBadges,
-    dailyQuests,
-    leaderboard,
-    bonusClaimed,
-  ];
+        profile,
+        earnedBadges,
+        dailyQuests,
+        leaderboard,
+        bonusClaimed,
+      ];
 }
 
 class GamificationError extends GamificationState {

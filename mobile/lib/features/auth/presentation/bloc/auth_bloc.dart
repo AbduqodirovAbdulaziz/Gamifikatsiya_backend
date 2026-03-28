@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../data/repositories/auth_repository.dart';
+export '../../data/repositories/auth_repository.dart' show User;
 
 // Events
 abstract class AuthEvent extends Equatable {
@@ -11,13 +12,13 @@ abstract class AuthEvent extends Equatable {
 class AuthCheckRequested extends AuthEvent {}
 
 class AuthLoginRequested extends AuthEvent {
-  final String email;
+  final String username;
   final String password;
 
-  AuthLoginRequested({required this.email, required this.password});
+  AuthLoginRequested({required this.username, required this.password});
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [username, password];
 }
 
 class AuthRegisterRequested extends AuthEvent {
@@ -105,7 +106,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      await _authRepository.login(email: event.email, password: event.password);
+      await _authRepository.login(
+          username: event.username, password: event.password);
       final user = await _authRepository.getCurrentUser();
       emit(AuthAuthenticated(user));
     } catch (e) {

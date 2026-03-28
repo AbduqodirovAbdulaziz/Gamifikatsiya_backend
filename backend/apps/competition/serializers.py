@@ -5,9 +5,7 @@ from .models import Tournament, TournamentParticipant, Challenge, ChallengeAttem
 class TournamentParticipantSerializer(serializers.ModelSerializer):
     student_username = serializers.CharField(source="student.username", read_only=True)
     student_avatar = serializers.ImageField(source="student.avatar", read_only=True)
-    level = serializers.IntegerField(
-        source="student.student_profile.level", read_only=True
-    )
+    level = serializers.SerializerMethodField()
 
     class Meta:
         model = TournamentParticipant
@@ -21,6 +19,10 @@ class TournamentParticipantSerializer(serializers.ModelSerializer):
             "rank_position",
             "registered_at",
         ]
+
+    def get_level(self, obj):
+        profile = getattr(obj.student, "student_profile", None)
+        return profile.level if profile else 1
 
 
 class TournamentListSerializer(serializers.ModelSerializer):
@@ -114,18 +116,15 @@ class ChallengeSerializer(serializers.ModelSerializer):
     challenger_avatar = serializers.ImageField(
         source="challenger.avatar", read_only=True
     )
-    challenger_level = serializers.IntegerField(
-        source="challenger.student_profile.level", read_only=True
-    )
+    challenger_level = serializers.SerializerMethodField()
     opponent_username = serializers.CharField(
         source="opponent.username", read_only=True
     )
     opponent_avatar = serializers.ImageField(source="opponent.avatar", read_only=True)
-    opponent_level = serializers.IntegerField(
-        source="opponent.student_profile.level", read_only=True
-    )
+    opponent_level = serializers.SerializerMethodField()
     quiz_title = serializers.CharField(source="quiz.title", read_only=True)
     expires_in_seconds = serializers.SerializerMethodField()
+    show_scores = serializers.SerializerMethodField()
 
     class Meta:
         model = Challenge
@@ -150,13 +149,33 @@ class ChallengeSerializer(serializers.ModelSerializer):
             "expires_at",
             "expires_in_seconds",
             "created_at",
+            "show_scores",
         ]
+
+    def get_challenger_level(self, obj):
+        profile = getattr(obj.challenger, "student_profile", None)
+        return profile.level if profile else 1
+
+    def get_opponent_level(self, obj):
+        profile = getattr(obj.opponent, "student_profile", None)
+        return profile.level if profile else 1
 
     def get_expires_in_seconds(self, obj):
         from django.utils import timezone
 
+        if not obj.expires_at:
+            return None
         delta = obj.expires_at - timezone.now()
         return max(0, int(delta.total_seconds()))
+
+    def get_show_scores(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        user = request.user
+        return (
+            obj.challenger == user or obj.opponent == user or user.is_staff
+        ) and obj.status == "completed"
 
 
 class ChallengeCreateSerializer(serializers.Serializer):

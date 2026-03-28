@@ -108,11 +108,15 @@ class QuizViewSet(viewsets.ModelViewSet):
 
         earned_points = 0
         correct_count = 0
+        valid_question_ids = set(quiz.questions.values_list("id", flat=True))
 
         for answer_data in answers_data:
             question_id = answer_data.get("question_id")
             selected_choice_id = answer_data.get("selected_choice_id")
             time_on_question = answer_data.get("time_taken_seconds", 0)
+
+            if question_id not in valid_question_ids:
+                continue
 
             try:
                 question = quiz.questions.get(id=question_id)
@@ -134,10 +138,11 @@ class QuizViewSet(viewsets.ModelViewSet):
                         student_answer.points_earned = question.points
                         earned_points += question.points
                         correct_count += 1
+                    student_answer.save()
                 except AnswerChoice.DoesNotExist:
-                    pass
-
-            student_answer.save()
+                    student_answer.save()
+            else:
+                student_answer.save()
 
         attempt.earned_points = earned_points
         attempt.percentage = (
@@ -200,6 +205,15 @@ class QuizViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def leaderboard(self, request, pk=None):
         quiz = self.get_object()
+        user = request.user
+
+        if user.role == "teacher":
+            if quiz.created_by != user:
+                return Response(
+                    {"error": "Bu test liderlarini ko'rish huquqingiz yo'q"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         attempts = (
             quiz.attempts.filter(is_completed=True)
             .select_related("student", "student__student_profile")
@@ -208,7 +222,7 @@ class QuizViewSet(viewsets.ModelViewSet):
 
         leaderboard = []
         for rank, attempt in enumerate(attempts, 1):
-            profile = attempt.student.student_profile
+            profile = getattr(attempt.student, "student_profile", None)
             leaderboard.append(
                 {
                     "rank": rank,
@@ -221,6 +235,7 @@ class QuizViewSet(viewsets.ModelViewSet):
                     "time_taken": attempt.time_taken_seconds,
                     "xp_earned": attempt.xp_earned,
                     "level": profile.level if profile else 1,
+                    "is_current_user": attempt.student == user,
                 }
             )
 
@@ -230,8 +245,21 @@ class QuizViewSet(viewsets.ModelViewSet):
     def attempt_detail(self, request, pk=None, attempt_id=None):
         quiz = self.get_object()
         user = request.user
-        attempt = get_object_or_404(QuizAttempt, id=attempt_id, quiz=quiz, student=user)
-        return Response(QuizAttemptSerializer(attempt).data)
+
+        if user.role == "teacher":
+            attempt = get_object_or_404(QuizAttempt, id=attempt_id, quiz=quiz)
+        else:
+            attempt = get_object_or_404(
+                QuizAttempt, id=attempt_id, quiz=quiz, student=user
+            )
+
+        serializer = QuizAttemptSerializer(attempt)
+        data = serializer.data
+
+        if user.role != "teacher" and not quiz.show_answers:
+            data.pop("answers", None)
+
+        return Response(data)
 
 
 class QuestionViewSet(viewsets.ModelViewSet):

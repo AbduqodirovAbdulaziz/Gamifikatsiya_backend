@@ -10,15 +10,15 @@ class GamificationRepository {
     return GamificationProfile.fromJson(response.data);
   }
 
-  Future<List<Badge>> getBadges() async {
+  Future<List<GameBadge>> getBadges() async {
     final response = await _apiClient.get(ApiEndpoints.badges);
-    return (response.data as List).map((e) => Badge.fromJson(e)).toList();
+    return (response.data as List).map((e) => GameBadge.fromJson(e)).toList();
   }
 
-  Future<List<Badge>> getEarnedBadges() async {
+  Future<List<GameBadge>> getEarnedBadges() async {
     final response = await _apiClient.get(ApiEndpoints.earnedBadges);
     return (response.data as List)
-        .map((e) => Badge.fromJson(e['badge']))
+        .map((e) => GameBadge.fromJson(e['badge']))
         .toList();
   }
 
@@ -128,7 +128,7 @@ class LevelProgress {
   }
 }
 
-class Badge {
+class GameBadge {
   final String id;
   final String name;
   final String description;
@@ -137,7 +137,7 @@ class Badge {
   final String rarity;
   final int xpBonus;
 
-  Badge({
+  GameBadge({
     required this.id,
     required this.name,
     required this.description,
@@ -147,8 +147,8 @@ class Badge {
     required this.xpBonus,
   });
 
-  factory Badge.fromJson(Map<String, dynamic> json) {
-    return Badge(
+  factory GameBadge.fromJson(Map<String, dynamic> json) {
+    return GameBadge(
       id: json['id'],
       name: json['name'],
       description: json['description'],

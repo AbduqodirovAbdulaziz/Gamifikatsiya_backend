@@ -1,4 +1,4 @@
-import '../../../../core/network/api_client.dart';
+import 'package:edugame/core/network/api_client.dart';
 
 class AuthRepository {
   final ApiClient _apiClient;
@@ -36,12 +36,12 @@ class AuthRepository {
   }
 
   Future<AuthResponse> login({
-    required String email,
+    required String username,
     required String password,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.login,
-      data: {'email': email, 'password': password},
+      data: {'username': username, 'password': password},
     );
 
     await _apiClient.saveTokens(
