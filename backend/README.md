@@ -1,134 +1,110 @@
-# EduGame Backend - Gamifikatsiya Asosidagi Ta'lim Platformasi
+# EduGame Backend
 
 Django REST Framework bilan yozilgan backend API.
 
-## 🚀 Render.com da Deploy Qilish
+## Render Deploy
 
-### 1. GitHub ga yuklash
+### Blueprint orqali deploy
 
-```bash
-# GitHub da yangi repo yarating, keyin:
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/USERNAME/edugame-backend.git
-git push -u origin main
-```
+Repo ichida `backend` va `mobile` birga turadi, lekin Render faqat `backend` papkani deploy qiladi. Buning uchun repo ildizidagi `render.yaml` ishlatiladi.
 
-### 2. Render.com da Deploy
+1. [Render.com](https://render.com) ga kiring.
+2. `New +` -> `Blueprint` ni tanlang.
+3. GitHub repositoriyani ulang.
+4. Quyidagilarni kiriting:
+   - `Blueprint Name`: `gamifikatsiya-backend-prod`
+   - `Branch`: `main`
+   - `Blueprint Path`: `render.yaml`
 
-1. [Render.com](https://render.com) ga kiring
-2. **"New +"** → **"Web Service"** tanlang
-3. GitHub repositoriyani ulang
-4. Sozlamalar:
-   - **Name:** `edugame-api`
-   - **Region:** Oregon (yoki sizga yaqin)
-   - **Branch:** `main`
-   - **Root Directory:** `backend`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2`
+### Blueprint nima qiladi
 
-5. **Environment** bo'limida:
-   - `SECRET_KEY` - ixtiyoriy (Render avtomatik yaratadi)
-   - `DEBUG` = `False`
-   - `ALLOWED_HOSTS` = `edugame-api.onrender.com`
+- Repo ildizidagi `render.yaml` ni o'qiydi.
+- `rootDir: backend` sabab faqat `backend` papkani build qiladi.
+- `mobile` papkasini deployga qo'shmaydi.
+- `bash ./build.sh` orqali backendni yig'adi.
+- `daphne` bilan ASGI serverni ishga tushiradi.
 
-6. **"Create Web Service"** tugmasini bosing
+### PostgreSQL yaratish
 
-### 3. PostgreSQL yaratish
+1. `New +` -> `PostgreSQL` ni tanlang.
+2. Region sifatida web service bilan bir xil regionni tanlang.
+3. Plan sifatida `Free` ni tanlang.
+4. Database yaratilgandan so'ng `Internal Database URL` ni nusxa oling.
 
-1. **"New +"** → **"PostgreSQL"** tanlang
-2. **Name:** `edugame-db`
-3. **Region:** Web service bilan bir xil
-4. **Plan:** Free
-5. **"Create Database"** tugmasini bosing
-6. Database yaratilgandan so'ng, **"Connection Details"** → **"Internal Connection String"** ni nusxa oling
+### Environment variables
 
-### 4. Web Service ni yangilash
+Web service ichida kamida quyidagilarni tekshiring:
 
-1. Web service sozlamariga o'ting
-2. **Environment** bo'limida yangi variable qo'shing:
-   - `DATABASE_URL` = (nusxa olgan connection string)
+- `DATABASE_URL`: PostgreSQL internal URL
+- `DJANGO_SETTINGS_MODULE`: `config.settings.production`
+- `SECRET_KEY`: Render avtomatik yaratadi
 
-### 5. Migrations qo'llash
+Agar web frontend bo'lsa, qo'shing:
 
-1. Web service dashboardda **"Shell"** tugmasini bosing
-2. Quyidagi buyruqlarni kiriting:
+- `FRONTEND_URL`
+- `CORS_ALLOWED_ORIGINS`
+- `CSRF_TRUSTED_ORIGINS`
+
+### Free plan uchun migratsiyalar
+
+Free plan da `preDeployCommand` ishlamaydi, shuning uchun migratsiyalarni deploydan keyin qo'lda ishga tushiring.
 
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py collectstatic --noinput
 ```
 
-## 📁 Loyiha Tuzilmasi
+### Tekshiruv
 
-```
+Deploy tugagach quyidagilarni tekshiring:
+
+- `https://<render-domain>/health/`
+- `https://<render-domain>/admin/`
+- `https://<render-domain>/api/docs/`
+
+`/health/` endpoint `{"status":"ok"}` qaytarishi kerak.
+
+## Loyiha Tuzilmasi
+
+```text
 backend/
-├── apps/
-│   ├── users/          # Foydalanuvchilar
-│   ├── classroom/      # Sinfxonalar
-│   ├── courses/        # Kurslar
-│   ├── quizzes/        # Testlar
-│   ├── gamification/   # Gamifikatsiya
-│   ├── competition/    # Musobaqalar
-│   ├── notifications/  # Bildirishnomalar
-│   └── chat/          # Chat
-├── config/
-│   ├── settings/      # Django sozlamalari
-│   ├── urls.py        # URL marshrutlari
-│   ├── wsgi.py        # WSGI
-│   └── asgi.py        # ASGI
-├── requirements.txt    # Kutubxonalar
-├── manage.py          # Django CLI
-└── Procfile           # Render uchun
+|-- apps/
+|   |-- users/
+|   |-- classroom/
+|   |-- courses/
+|   |-- quizzes/
+|   |-- gamification/
+|   |-- competition/
+|   |-- notifications/
+|   `-- chat/
+|-- config/
+|   |-- settings/
+|   |-- urls.py
+|   |-- wsgi.py
+|   `-- asgi.py
+|-- requirements.txt
+|-- manage.py
+`-- Procfile
 ```
 
-## 🔌 API Endpoints
+## Asosiy Endpointlar
 
-| Endpoint | Tavsif |
-|----------|--------|
-| `POST /api/v1/auth/register/` | Ro'yxatdan o'tish |
-| `POST /api/v1/auth/login/` | Kirish |
-| `GET /api/v1/users/profile/` | Profil |
-| `GET /api/v1/classrooms/` | Sinfxonalar |
-| `GET /api/v1/courses/` | Kurslar |
-| `GET /api/v1/quizzes/` | Testlar |
-| `GET /api/v1/gamification/profile/` | XP, Level, Badge |
-| `GET /api/v1/leaderboard/` | Reyting |
+- `POST /api/v1/auth/register/`
+- `POST /api/v1/auth/login/`
+- `GET /api/v1/users/profile/`
+- `GET /api/v1/classrooms/`
+- `GET /api/v1/courses/`
+- `GET /api/v1/quizzes/`
+- `GET /api/v1/gamification/profile/`
+- `GET /api/v1/leaderboard/`
 
-## 🛠 Mahalliy Ishga Tushurish
+## Mahalliy Ishga Tushurish
 
 ```bash
 cd backend
-
-# Virtual environment yaratish
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Kutubxonalarni o'rnatish
 pip install -r requirements.txt
-
-# Migratsiyalar
 python manage.py migrate
-
-# Serverni ishga tushurish
 python manage.py runserver
 ```
-
-## 📚 Hujjatlar
-
-- [API Dokumentatsiya](https://edugame-api.onrender.com/api/docs/) - Swagger UI
-- [Implementation Plan](../implementation_plan.md) - Loyiha rejalashtirish
-
-## 🛡 Xavfsizlik
-
-- JWT Authentication
-- Parol hash
-- CORS himoyasi
-- Rate limiting
-
-## 📄 Litsenziya
-
-MIT License
