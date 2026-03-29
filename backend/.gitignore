@@ -69,9 +69,6 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
-
 # celery beat schedule file
 celerybeat-schedule
 celerybeat.pid
@@ -106,6 +103,8 @@ venv.bak/
 .vscode/
 *.swp
 *.swo
+*.backup
+*.bak
 
 # OS
 .DS_Store
