@@ -1,4 +1,5 @@
 import 'package:edugame/core/network/api_client.dart';
+import '../../domain/entities/user.dart' as domain;
 
 class AuthRepository {
   final ApiClient _apiClient;
@@ -55,16 +56,16 @@ class AuthRepository {
     );
   }
 
-  Future<User> getCurrentUser() async {
+  Future<domain.User> getCurrentUser() async {
     final response = await _apiClient.get(ApiEndpoints.profile);
-    return User.fromJson(response.data);
+    return domain.User.fromJson(response.data);
   }
 
   Future<void> logout() async {
     await _apiClient.logout();
   }
 
-  Future<User> updateProfile({
+  Future<domain.User> updateProfile({
     String? firstName,
     String? lastName,
     String? bio,
@@ -79,7 +80,7 @@ class AuthRepository {
         if (phone != null) 'phone': phone,
       },
     );
-    return User.fromJson(response.data);
+    return domain.User.fromJson(response.data);
   }
 
   Future<String> uploadAvatar(String filePath) async {
@@ -105,7 +106,7 @@ class AuthRepository {
 class AuthResponse {
   final String? accessToken;
   final String? refreshToken;
-  final User? user;
+  final domain.User? user;
   final String? message;
 
   AuthResponse({this.accessToken, this.refreshToken, this.user, this.message});
@@ -115,43 +116,8 @@ class AuthResponse {
     return AuthResponse(
       accessToken: tokens?['access'],
       refreshToken: tokens?['refresh'],
-      user: json['user'] != null ? User.fromJson(json['user']) : null,
+      user: json['user'] != null ? domain.User.fromJson(json['user']) : null,
       message: json['message'],
-    );
-  }
-}
-
-class User {
-  final String id;
-  final String email;
-  final String username;
-  final String? firstName;
-  final String? lastName;
-  final String role;
-  final String? avatar;
-  final String? bio;
-
-  User({
-    required this.id,
-    required this.email,
-    required this.username,
-    this.firstName,
-    this.lastName,
-    required this.role,
-    this.avatar,
-    this.bio,
-  });
-
-  factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'],
-      email: json['email'],
-      username: json['username'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      role: json['role'],
-      avatar: json['avatar'],
-      bio: json['bio'],
     );
   }
 }

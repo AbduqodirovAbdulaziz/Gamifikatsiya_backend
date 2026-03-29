@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import 'quiz_play_page.dart';
 
 class QuizListPage extends StatefulWidget {
   const QuizListPage({super.key});
@@ -179,7 +180,15 @@ class _QuizListPageState extends State<QuizListPage> {
                 ),
                 const Spacer(),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            QuizPlayPage(quizId: quiz['id'].toString()),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,

@@ -11,6 +11,7 @@ services:
         - render.yaml
     buildCommand: bash ./build.sh
     startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    preDeployCommand: python manage.py migrate --noinput
     healthCheckPath: /health/
     envVars:
       - key: DATABASE_URL

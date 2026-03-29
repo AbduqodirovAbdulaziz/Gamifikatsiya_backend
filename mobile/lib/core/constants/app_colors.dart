@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const Color primary = Color(0xFF6366F1);
   static const Color primaryDark = Color(0xFF4F46E5);
+  static const Color primaryLight = Color(0xFF818CF8);
   static const Color secondary = Color(0xFF10B981);
   static const Color accent = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
@@ -31,6 +32,22 @@ class AppColors {
   static const Color levelEasy = Color(0xFF22C55E);
   static const Color levelMedium = Color(0xFF3B82F6);
   static const Color levelHard = Color(0xFFEF4444);
+
+  static const Color levelBeginner = Color(0xFF22C55E);
+  static const Color levelIntermediate = Color(0xFF3B82F6);
+  static const Color levelAdvanced = Color(0xFF8B5CF6);
+  static const Color levelExpert = Color(0xFFF59E0B);
+  static const Color levelMaster = Color(0xFFEF4444);
+
+  static const Color streakLow = Color(0xFFFEF3C7);
+  static const Color streakMedium = Color(0xFFFCD34D);
+  static const Color streakHigh = Color(0xFFF97316);
+  static const Color streakMax = Color(0xFFEF4444);
+
+  static const Color badgeCommon = Color(0xFF94A3B8);
+  static const Color badgeRare = Color(0xFF3B82F6);
+  static const Color badgeEpic = Color(0xFF8B5CF6);
+  static const Color badgeLegendary = Color(0xFFF59E0B);
 
   static const List<Color> levelColors = [
     Color(0xFF6366F1),

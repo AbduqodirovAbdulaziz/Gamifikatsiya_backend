@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_spectacular",
+    "channels",
     "apps.users",
     "apps.classroom",
     "apps.courses",

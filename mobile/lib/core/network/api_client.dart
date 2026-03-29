@@ -1,8 +1,33 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:8000/api/v1';
+  // Local development: use your machine's IP for physical device testing
+  // For Android emulator use: http://10.0.2.2:8000/api/v1
+  // For iOS simulator use: http://localhost:8000/api/v1
+  // For physical device use: http://YOUR_LOCAL_IP:8000/api/v1
+  static String get baseUrl {
+    const envUrl = String.fromEnvironment('API_URL');
+    if (envUrl.isNotEmpty) return envUrl;
+
+    // Default to local network IP for testing
+    if (kIsWeb) {
+      return 'http://localhost:8000/api/v1';
+    }
+    // For Android emulator, 10.0.2.2 maps to host machine's localhost
+    return 'http://10.0.2.2:8000/api/v1';
+  }
+
+  static String get wsBaseUrl {
+    const envWsUrl = String.fromEnvironment('WS_URL');
+    if (envWsUrl.isNotEmpty) return envWsUrl;
+
+    if (kIsWeb) {
+      return 'ws://localhost:8000/ws';
+    }
+    return 'ws://10.0.2.2:8000/ws';
+  }
 
   late final Dio _dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -27,9 +52,28 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          if (kDebugMode) {
+            print('REQUEST: ${options.method} ${options.path}');
+          }
           return handler.next(options);
         },
+        onResponse: (response, handler) {
+          if (kDebugMode) {
+            print(
+                'RESPONSE: ${response.statusCode} ${response.requestOptions.path}');
+          }
+          return handler.next(response);
+        },
         onError: (error, handler) async {
+          if (kDebugMode) {
+            print(
+                'ERROR: ${error.response?.statusCode} ${error.requestOptions.path}');
+            print('ERROR TYPE: ${error.type}');
+            print('ERROR MESSAGE: ${error.message}');
+            if (error.response != null) {
+              print('ERROR BODY: ${error.response?.data}');
+            }
+          }
           if (error.response?.statusCode == 401) {
             final refreshed = await _refreshToken();
             if (refreshed) {
@@ -169,5 +213,11 @@ class ApiEndpoints {
   // Notifications
   static const String notifications = '/notifications/';
   static String markRead(String id) => '/notifications/$id/read/';
+  static const String markAllRead = '/notifications/mark_all_read/';
   static const String unreadCount = '/notifications/unread_count/';
+
+  // Chat
+  static String chatRoomMessages(String roomId) =>
+      '/chat/rooms/$roomId/messages/';
+  static const String chatRooms = '/chat/rooms/';
 }

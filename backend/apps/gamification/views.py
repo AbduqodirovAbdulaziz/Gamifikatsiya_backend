@@ -8,6 +8,7 @@ from .models import (
     Badge,
     UserBadge,
     XPTransaction,
+    CoinTransaction,
     Streak,
     DailyQuest,
     LeaderboardEntry,
@@ -16,12 +17,14 @@ from .serializers import (
     BadgeSerializer,
     UserBadgeSerializer,
     XPTransactionSerializer,
+    CoinTransactionSerializer,
     StreakSerializer,
     DailyQuestSerializer,
     GamificationProfileSerializer,
     LeaderboardSerializer,
 )
 from .services import GamificationService
+from apps.users.permissions import IsStudent
 
 
 class GamificationProfileView(generics.RetrieveAPIView):
@@ -65,11 +68,13 @@ class UserBadgeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = UserBadgeSerializer
 
     def get_queryset(self):
-        return UserBadge.objects.filter(student=self.request.user)
+        return UserBadge.objects.filter(student=self.request.user).select_related(
+            "badge"
+        )
 
     @action(detail=False, methods=["get"])
     def earned(self, request):
-        badges = self.get_queryset().select_related("badge")
+        badges = self.get_queryset()
         serializer = self.get_serializer(badges, many=True)
         return Response(serializer.data)
 
@@ -77,7 +82,7 @@ class UserBadgeViewSet(viewsets.ReadOnlyModelViewSet):
     def toggle_display(self, request, pk=None):
         user_badge = self.get_object()
         user_badge.is_displayed = not user_badge.is_displayed
-        user_badge.save()
+        user_badge.save(update_fields=["is_displayed"])
         return Response({"is_displayed": user_badge.is_displayed})
 
 
@@ -86,7 +91,19 @@ class XPHistoryView(generics.ListAPIView):
     serializer_class = XPTransactionSerializer
 
     def get_queryset(self):
-        return XPTransaction.objects.filter(student=self.request.user)[:50]
+        return XPTransaction.objects.filter(student=self.request.user).select_related(
+            "student"
+        )[:50]
+
+
+class CoinHistoryView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CoinTransactionSerializer
+
+    def get_queryset(self):
+        return CoinTransaction.objects.filter(student=self.request.user).select_related(
+            "student"
+        )[:50]
 
 
 class StreakView(generics.RetrieveAPIView):
@@ -106,10 +123,12 @@ class DailyQuestView(generics.ListAPIView):
         from datetime import date
 
         today = date.today()
-        quests = DailyQuest.objects.filter(student=self.request.user, date=today)
+        quests = DailyQuest.objects.filter(
+            student=self.request.user, date=today
+        ).select_related("student")
 
         if not quests.exists():
-            quests = GamificationService.generate_daily_quests(self.request.user)
+            GamificationService.generate_daily_quests(self.request.user.id)
             quests = DailyQuest.objects.filter(student=self.request.user, date=today)
 
         return quests
@@ -122,28 +141,17 @@ class LeaderboardView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         period = request.query_params.get("period", "weekly")
         classroom_id = request.query_params.get("classroom_id")
+        limit = int(request.query_params.get("limit", 20))
 
-        entries = GamificationService.get_leaderboard(period, classroom_id)
-
-        user_rank = None
-        user_id = str(request.user.id)
-        for entry in entries:
-            if str(entry.get("student", {}).get("id")) == user_id:
-                user_rank = entry.get("rank")
-                break
-
-        return Response(
-            {
-                "period": period,
-                "classroom_id": classroom_id,
-                "entries": entries,
-                "user_rank": user_rank,
-            }
+        result = GamificationService.get_leaderboard(
+            period, classroom_id, limit, request.user.id
         )
+
+        return Response(result)
 
 
 class DailyBonusView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsStudent]
 
     def post(self, request):
         result = GamificationService.claim_daily_bonus(request.user.id)
@@ -172,8 +180,6 @@ class UpdateQuestProgressView(generics.GenericAPIView):
                 {"error": "Vazifa topilmadi"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        from .serializers import DailyQuestSerializer
-
         return Response(DailyQuestSerializer(quest).data)
 
 
@@ -194,3 +200,42 @@ class CheckLevelUpView(generics.GenericAPIView):
                 "progress": xp_progress,
             }
         )
+
+
+class ShopView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsStudent]
+
+    def get(self, request):
+        items = GamificationService.get_shop_items()
+        return Response(items)
+
+
+class PurchaseView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsStudent]
+
+    def post(self, request):
+        item_id = request.data.get("item_id")
+
+        if not item_id:
+            return Response(
+                {"error": "item_id talab qilinadi"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = GamificationService.purchase_item(request.user.id, item_id)
+
+        if not result["success"]:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result)
+
+
+class BuyStreakFreezeView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsStudent]
+
+    def post(self, request):
+        result = GamificationService.buy_streak_freeze(request.user.id)
+
+        if not result["success"]:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result)

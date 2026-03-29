@@ -9,6 +9,9 @@ from .views import (
     FCMTokenView,
     StudentProfileView,
     TeacherProfileView,
+    ParentChildListView,
+    ParentChildDetailView,
+    ParentChildProgressView,
 )
 
 urlpatterns = [
@@ -19,4 +22,15 @@ urlpatterns = [
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("avatar/", AvatarUploadView.as_view(), name="avatar-upload"),
     path("fcm-token/", FCMTokenView.as_view(), name="fcm-token"),
+    path("children/", ParentChildListView.as_view(), name="parent-children"),
+    path(
+        "children/<uuid:child_id>/",
+        ParentChildDetailView.as_view(),
+        name="parent-child-detail",
+    ),
+    path(
+        "children/<uuid:child_id>/progress/",
+        ParentChildProgressView.as_view(),
+        name="parent-child-progress",
+    ),
 ]

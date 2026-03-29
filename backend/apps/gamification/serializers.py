@@ -3,6 +3,7 @@ from .models import (
     Badge,
     UserBadge,
     XPTransaction,
+    CoinTransaction,
     Streak,
     DailyQuest,
     LevelTitle,
@@ -41,6 +42,12 @@ class XPTransactionSerializer(serializers.ModelSerializer):
         fields = ["id", "amount", "transaction_type", "description", "created_at"]
 
 
+class CoinTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoinTransaction
+        fields = ["id", "amount", "transaction_type", "description", "balance_after", "created_at"]
+
+
 class StreakSerializer(serializers.ModelSerializer):
     class Meta:
         model = Streak
@@ -66,6 +73,7 @@ class DailyQuestSerializer(serializers.ModelSerializer):
             "target_count",
             "current_count",
             "xp_reward",
+            "coin_reward",
             "is_completed",
             "date",
             "completed_at",
@@ -105,9 +113,19 @@ class LeaderboardSerializer(serializers.Serializer):
     user_rank = serializers.IntegerField(allow_null=True)
 
 
+class ShopItemSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField()
+    description = serializers.CharField()
+    price = serializers.IntegerField()
+    type = serializers.CharField()
+    icon = serializers.CharField()
+
+
 class DailyBonusResponseSerializer(serializers.Serializer):
     claimed = serializers.BooleanField()
     xp_earned = serializers.IntegerField(required=False)
+    coins_earned = serializers.IntegerField(required=False)
     message = serializers.CharField(required=False)
 
 
@@ -118,3 +136,11 @@ class BadgeEarnedNotificationSerializer(serializers.Serializer):
     xp_bonus = serializers.IntegerField()
     level_up = serializers.BooleanField()
     new_level = serializers.IntegerField(required=False)
+
+
+class PurchaseResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    item = ShopItemSerializer(required=False)
+    coins_spent = serializers.IntegerField(required=False)
+    remaining_coins = serializers.IntegerField(required=False)
+    error = serializers.CharField(required=False)

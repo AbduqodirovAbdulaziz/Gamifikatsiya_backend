@@ -22,9 +22,13 @@ if render_url:
     render_host = urlparse(render_url).hostname
     if render_host and render_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(render_host)
+# Render sets RENDER=true; .onrender.com matches any *.onrender.com hostname if env vars are missing
+if not ALLOWED_HOSTS and os.environ.get("RENDER") == "true":
+    ALLOWED_HOSTS.append(".onrender.com")
 if not ALLOWED_HOSTS:
     raise ValueError(
-        "ALLOWED_HOSTS, RENDER_EXTERNAL_HOSTNAME, or RENDER_EXTERNAL_URL environment variable is required in production"
+        "ALLOWED_HOSTS, RENDER_EXTERNAL_HOSTNAME, RENDER_EXTERNAL_URL, or deploy on Render "
+        "(RENDER=true) is required in production"
     )
 
 CORS_ALLOWED_ORIGINS = split_env_list("CORS_ALLOWED_ORIGINS")
@@ -55,6 +59,17 @@ SECURE_HSTS_PRELOAD = True
 database_url = os.environ.get("DATABASE_URL")
 if database_url:
     DATABASES["default"] = dj_database_url.parse(database_url, conn_max_age=600)
+    db = DATABASES["default"]
+    if "postgresql" in db.get("ENGINE", ""):
+        opts = db.setdefault("OPTIONS", {})
+        # Supabase / managed Postgres require TLS; add if URL did not set sslmode
+        if "sslmode" not in database_url.lower() and "sslmode" not in opts:
+            opts["sslmode"] = "require"
+        # Transaction pooler (Supabase port 6543 / pooler host) is incompatible with server-side cursors
+        host = db.get("HOST") or ""
+        port = str(db.get("PORT") or "")
+        if "pooler.supabase.com" in host or port == "6543":
+            db["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 redis_url = os.environ.get("REDIS_URL")
 

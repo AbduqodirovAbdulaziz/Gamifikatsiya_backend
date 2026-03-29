@@ -1,13 +1,3 @@
-import 'package:flutter/material.dart';
-import '../../data/repositories/gamification_repository.dart';
-
-class BadgeWidget extends StatelessWidget {
-  final GameBadge badge;
-
-  const BadgeWidget({super.key, required this.badge});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container();
-  }
-}
+// BadgeWidget is defined in xp_bar_widget.dart
+// This file re-exports it for backward compatibility
+export 'xp_bar_widget.dart' show BadgeWidget;

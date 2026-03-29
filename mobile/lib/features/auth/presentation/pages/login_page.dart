@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/utils/dependency_injection.dart';
+import '../../../../core/di/injection.dart';
 import '../bloc/auth_bloc.dart';
 import 'register_page.dart';
 

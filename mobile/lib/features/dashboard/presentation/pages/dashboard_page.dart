@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -8,7 +9,13 @@ import '../../../auth/presentation/pages/login_page.dart';
 import '../../../courses/presentation/pages/courses_page.dart';
 import '../../../quiz/presentation/pages/quiz_list_page.dart';
 import '../../../gamification/presentation/pages/leaderboard_page.dart';
+import '../../../gamification/presentation/pages/badges_page.dart';
+import '../../../gamification/presentation/pages/xp_history_page.dart';
 import '../../../competition/presentation/pages/challenge_page.dart';
+import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../chat/presentation/pages/chat_page.dart';
+import '../../../notifications/presentation/pages/notification_page.dart';
+import '../../../classroom/presentation/pages/classroom_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -62,7 +69,26 @@ class _DashboardPageState extends State<DashboardPage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationPage()),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.chat_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(
+                      roomId: 'general',
+                      roomName: 'Umumiy chat',
+                    ),
+                  ),
+                );
+              },
             ),
             IconButton(
               icon: const Icon(Icons.logout),
@@ -80,6 +106,8 @@ class _DashboardPageState extends State<DashboardPage> {
             const QuizListPage(),
             const LeaderboardPage(),
             const ChallengePage(),
+            const ClassroomPage(),
+            const ProfilePage(),
           ],
         ),
         bottomNavigationBar: NavigationBar(
@@ -114,6 +142,16 @@ class _DashboardPageState extends State<DashboardPage> {
               icon: Icon(Icons.emoji_events_outlined),
               selectedIcon: Icon(Icons.emoji_events),
               label: 'Bellashuv',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.class_outlined),
+              selectedIcon: Icon(Icons.class_),
+              label: 'Sinf',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profil',
             ),
           ],
         ),
@@ -394,11 +432,37 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Expanded(
                   child: _buildActionButton(
-                      Icons.play_arrow, 'Test boshlash', AppColors.primary)),
+                      Icons.play_arrow, 'Test boshlash', AppColors.primary, () {
+                setState(() => _currentIndex = 2);
+              })),
               const SizedBox(width: 12),
               Expanded(
                   child: _buildActionButton(
-                      Icons.emoji_events, 'Bellashuv', AppColors.accent)),
+                      Icons.emoji_events, 'Bellashuv', AppColors.accent, () {
+                setState(() => _currentIndex = 4);
+              })),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                  child: _buildActionButton(
+                      Icons.emoji_events, 'Badges', AppColors.xpYellow, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BadgesPage()),
+                );
+              })),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _buildActionButton(
+                      Icons.history, 'XP Tarixi', AppColors.success, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const XPHistoryPage()),
+                );
+              })),
             ],
           ),
         ],
@@ -406,9 +470,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildActionButton(IconData? icon, String? label, Color? color) {
+  Widget _buildActionButton(
+      IconData? icon, String? label, Color? color, VoidCallback onTap) {
     return ElevatedButton.icon(
-      onPressed: () {},
+      onPressed: onTap,
       icon: Icon(icon),
       label: Text(label ?? ''),
       style: ElevatedButton.styleFrom(

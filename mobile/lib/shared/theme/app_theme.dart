@@ -1,6 +1,6 @@
-import 'package:edugame/core/constants/app_colors.dart';
-import 'package:edugame/core/constants/app_constants.dart' hide AppColors;
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {

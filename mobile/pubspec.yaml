@@ -23,7 +23,7 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.2.2
   
-  # UI
+  # UI/Animations
   fl_chart: ^0.67.0
   cached_network_image: ^3.3.1
   shimmer: ^3.0.0

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/repositories/gamification_repository.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../data/repositories/gamification_repository.dart';
 
 class XPBarWidget extends StatelessWidget {
   final double progress;
