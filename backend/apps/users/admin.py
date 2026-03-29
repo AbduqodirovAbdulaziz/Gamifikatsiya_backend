@@ -15,13 +15,14 @@ class CustomUserAdmin(BaseUserAdmin):
     ordering = ["-date_joined"]
     list_per_page = 25
     date_hierarchy = "date_joined"
+    autocomplete_fields = ["parent"]
 
     fieldsets = BaseUserAdmin.fieldsets + (
         (
             "Qo'shimcha ma'lumot",
             {
                 "fields": (
-                    "role", "avatar", "date_of_birth",
+                    "role", "parent", "avatar", "date_of_birth",
                     "bio", "phone", "fcm_token",
                     "is_online", "last_seen",
                 ),
@@ -55,10 +56,12 @@ class CustomUserAdmin(BaseUserAdmin):
         if obj.is_online:
             return format_html(
                 '<span style="color:#10b981;font-weight:600;">'
-                '<i class="fas fa-circle" style="font-size:8px;"></i> Online</span>'
+                '<i class="fas fa-circle" style="font-size:8px;"></i> {}</span>',
+                "Online",
             )
         return format_html(
-            '<span style="color:#9ca3af;font-size:12px;">Offline</span>'
+            '<span style="color:#9ca3af;font-size:12px;">{}</span>',
+            "Offline",
         )
 
 
@@ -149,9 +152,11 @@ class TeacherProfileAdmin(admin.ModelAdmin):
         if obj.is_verified:
             return format_html(
                 '<span style="color:#10b981;font-weight:700;">'
-                '<i class="fas fa-check-circle"></i> Tasdiqlangan</span>'
+                '<i class="fas fa-check-circle"></i> {}</span>',
+                "Tasdiqlangan",
             )
         return format_html(
             '<span style="color:#9ca3af;">'
-            '<i class="fas fa-clock"></i> Kutilmoqda</span>'
+            '<i class="fas fa-clock"></i> {}</span>',
+            "Kutilmoqda",
         )

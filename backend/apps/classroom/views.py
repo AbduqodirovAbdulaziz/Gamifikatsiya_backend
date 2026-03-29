@@ -17,15 +17,28 @@ from .serializers import (
     ClassroomStudentListSerializer,
 )
 from apps.users.models import StudentProfile
+from apps.users.permissions import IsTeacher
 
 
 class ClassroomViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy", "remove_student"}:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
+        if user.role == "admin" or user.is_staff:
+            return Classroom.objects.all()
         if user.role == "teacher":
             return Classroom.objects.filter(teacher=user)
+        if user.role == "parent":
+            return Classroom.objects.filter(
+                enrollments__student__parent=user,
+                enrollments__is_active=True,
+            ).distinct()
         return Classroom.objects.filter(
             enrollments__student=user, enrollments__is_active=True
         ).distinct()
@@ -191,8 +204,16 @@ class MyClassroomsView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == "admin" or user.is_staff:
+            return Classroom.objects.filter(is_active=True)
         if user.role == "teacher":
             return Classroom.objects.filter(teacher=user, is_active=True)
+        if user.role == "parent":
+            return Classroom.objects.filter(
+                enrollments__student__parent=user,
+                enrollments__is_active=True,
+                is_active=True,
+            ).distinct()
         return Classroom.objects.filter(
             enrollments__student=user, enrollments__is_active=True, is_active=True
         )

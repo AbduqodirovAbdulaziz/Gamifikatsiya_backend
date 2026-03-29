@@ -1,4 +1,5 @@
 import math
+import random
 from datetime import date, timedelta
 from django.db import transaction
 from django.core.cache import cache
@@ -21,6 +22,7 @@ class GamificationService:
     @transaction.atomic
     def award_xp(user_id, amount, transaction_type, description, related_id=None):
         from apps.users.models import StudentProfile
+        from apps.notifications.services import NotificationService
 
         try:
             profile = StudentProfile.objects.select_for_update().get(user_id=user_id)
@@ -31,7 +33,9 @@ class GamificationService:
 
         profile.xp_points += amount
         profile.total_points_earned += amount
-        profile.level = GamificationService.calculate_level(profile.xp_points)
+        new_level = GamificationService.calculate_level(profile.xp_points)
+        level_up = new_level > old_level
+        profile.level = new_level
         profile.save()
 
         XPTransaction.objects.create(
@@ -44,24 +48,23 @@ class GamificationService:
 
         GamificationService.update_leaderboard(user_id, amount)
 
-        level_up = profile.level > old_level
-
         if level_up:
             level_title = GamificationService.get_level_title(profile.level)
             GamificationService.check_and_award_badges(
                 user_id, "level_up", {"level": profile.level}
             )
+            NotificationService.notify_level_up(
+                str(user_id), profile.level, level_title
+            )
 
-        new_badges = GamificationService.check_and_award_badges(
-            user_id, transaction_type
-        )
+        GamificationService.check_and_award_badges(user_id, transaction_type)
 
         return {
             "xp_earned": amount,
             "total_xp": profile.xp_points,
             "level": profile.level,
             "level_up": level_up,
-            "new_badges": new_badges,
+            "new_badges": [],
         }
 
     @staticmethod
@@ -110,7 +113,58 @@ class GamificationService:
 
     @staticmethod
     @transaction.atomic
+    def award_coins(user_id, amount, description, related_id=None):
+        from apps.users.models import StudentProfile
+
+        try:
+            profile = StudentProfile.objects.select_for_update().get(user_id=user_id)
+        except StudentProfile.DoesNotExist:
+            return None
+
+        profile.coins += amount
+        profile.save()
+
+        return {
+            "coins_earned": amount,
+            "total_coins": profile.coins,
+        }
+
+    @staticmethod
+    @transaction.atomic
+    def spend_coins(user_id, amount, description):
+        from apps.users.models import StudentProfile
+
+        if amount <= 0:
+            return {"success": False, "error": "Coin miqdori musbat bo'lishi kerak"}
+
+        try:
+            profile = StudentProfile.objects.select_for_update().get(user_id=user_id)
+        except StudentProfile.DoesNotExist:
+            return {"success": False, "error": "Profil topilmadi"}
+
+        if profile.coins < amount:
+            return {
+                "success": False,
+                "error": "Yetarli coins yo'q",
+                "required": amount,
+                "available": profile.coins,
+            }
+
+        profile.coins -= amount
+        profile.save()
+
+        return {
+            "success": True,
+            "coins_spent": amount,
+            "remaining_coins": profile.coins,
+            "description": description,
+        }
+
+    @staticmethod
+    @transaction.atomic
     def update_streak(user_id):
+        from apps.notifications.services import NotificationService
+
         streak, _ = Streak.objects.get_or_create(student_id=user_id)
         today = date.today()
 
@@ -152,6 +206,7 @@ class GamificationService:
     @staticmethod
     def check_and_award_badges(user_id, event_type, context=None):
         from apps.users.models import StudentProfile
+        from apps.notifications.services import NotificationService
 
         new_badges = []
         context = context or {}
@@ -174,17 +229,30 @@ class GamificationService:
                     if profile.total_quizzes_completed >= badge.condition_value:
                         earned = True
                 elif event_type == "lesson_complete":
-                    pass
+                    if (
+                        hasattr(profile, "lessons_completed")
+                        and profile.lessons_completed >= badge.condition_value
+                    ):
+                        earned = True
 
             elif badge.condition_type == "streak":
                 if event_type == "streak_updated":
                     streak = context.get("streak", 0)
                     if streak >= badge.condition_value:
                         earned = True
+            elif badge.condition_type == "percentage":
+                if event_type == "quiz_complete":
+                    percentage = context.get("percentage", 0)
+                    if percentage >= badge.condition_value:
+                        earned = True
 
             if earned:
                 user_badge = UserBadge.objects.create(student_id=user_id, badge=badge)
                 new_badges.append(user_badge)
+
+                NotificationService.notify_badge_earned(
+                    str(user_id), badge.name, badge.icon.url if badge.icon else None
+                )
 
                 if badge.xp_bonus > 0:
                     GamificationService.award_xp(
@@ -195,8 +263,9 @@ class GamificationService:
                     )
 
                 if badge.coin_bonus > 0:
-                    profile.coins += badge.coin_bonus
-                    profile.save()
+                    GamificationService.award_coins(
+                        user_id, badge.coin_bonus, f"{badge.name} badge uchun bonus"
+                    )
 
         return new_badges
 
@@ -229,51 +298,66 @@ class GamificationService:
             pass
 
     @staticmethod
-    def get_leaderboard(period="weekly", classroom_id=None, limit=20):
-        cache_key = f"leaderboard:{period}:class:{classroom_id or 'global'}"
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
-
+    def get_leaderboard(period="weekly", classroom_id=None, limit=20, user_id=None):
         from apps.users.serializers import UserPublicSerializer
 
         if classroom_id:
-            from apps.classroom.models import Enrollment
-
-            enrolled_students = Enrollment.objects.filter(
-                classroom_id=classroom_id, is_active=True
-            ).select_related("student", "student__student_profile")
-
-            entries = []
-            for enrollment in enrolled_students:
-                profile = enrollment.student.student_profile
-                entries.append(
-                    {
-                        "student": UserPublicSerializer(enrollment.student).data,
-                        "xp_points": profile.xp_points,
-                        "level": profile.level,
-                    }
-                )
+            cache_key = f"leaderboard:{period}:class:{classroom_id}"
         else:
-            from apps.users.models import StudentProfile
+            cache_key = f"leaderboard:{period}:global"
 
-            profiles = StudentProfile.objects.select_related("user").order_by(
-                "-xp_points"
-            )[:limit]
-            entries = [
-                {
-                    "student": UserPublicSerializer(p.user).data,
-                    "xp_points": p.xp_points,
-                    "level": p.level,
-                }
-                for p in profiles
-            ]
+        cached = cache.get(cache_key)
+        if cached:
+            entries = cached
+        else:
+            if classroom_id:
+                from apps.classroom.models import Enrollment
+
+                enrolled_students = Enrollment.objects.filter(
+                    classroom_id=classroom_id, is_active=True
+                ).select_related("student", "student__student_profile")
+
+                entries = []
+                for enrollment in enrolled_students:
+                    profile = enrollment.student.student_profile
+                    entries.append(
+                        {
+                            "student": UserPublicSerializer(enrollment.student).data,
+                            "xp_points": profile.xp_points,
+                            "level": profile.level,
+                            "rank": 0,
+                        }
+                    )
+            else:
+                from apps.users.models import StudentProfile
+
+                profiles = StudentProfile.objects.select_related("user").order_by(
+                    "-xp_points"
+                )[:limit]
+                entries = [
+                    {
+                        "student": UserPublicSerializer(p.user).data,
+                        "xp_points": p.xp_points,
+                        "level": p.level,
+                        "rank": 0,
+                    }
+                    for p in profiles
+                ]
+
+            entries.sort(key=lambda x: x["xp_points"], reverse=True)
+            cache.set(cache_key, entries, 300)
 
         for i, entry in enumerate(entries, 1):
             entry["rank"] = i
 
-        cache.set(cache_key, entries, 300)
-        return entries
+        user_rank = None
+        if user_id:
+            for entry in entries:
+                if entry["student"]["id"] == str(user_id):
+                    user_rank = entry["rank"]
+                    break
+
+        return {"entries": entries, "user_rank": user_rank, "period": period}
 
     @staticmethod
     def claim_daily_bonus(user_id):
@@ -283,15 +367,18 @@ class GamificationService:
         if cache.get(cache_key):
             return {"claimed": False, "message": "Bugungi bonus allaqachon olingan"}
 
-        bonus = 3
+        bonus_xp = 5
+        bonus_coins = 2
+
         GamificationService.award_xp(
-            user_id, bonus, "daily_bonus", "Kunlik kirish bonusi"
+            user_id, bonus_xp, "daily_bonus", "Kunlik kirish bonusi"
         )
+        GamificationService.award_coins(user_id, bonus_coins, "Kunlik coins bonus")
         GamificationService.update_streak(user_id)
 
         cache.set(cache_key, True, 86400)
 
-        return {"claimed": True, "xp_earned": bonus}
+        return {"claimed": True, "xp_earned": bonus_xp, "coins_earned": bonus_coins}
 
     @staticmethod
     def generate_daily_quests(user_id):
@@ -303,16 +390,36 @@ class GamificationService:
 
         quests = [
             DailyQuest(
-                student_id=user_id, quest_type="lesson", target_count=1, xp_reward=5
+                student_id=user_id,
+                quest_type="lesson",
+                target_count=1,
+                xp_reward=5,
+                coin_reward=1,
+                date=today,
             ),
             DailyQuest(
-                student_id=user_id, quest_type="quiz", target_count=1, xp_reward=10
+                student_id=user_id,
+                quest_type="quiz",
+                target_count=1,
+                xp_reward=10,
+                coin_reward=2,
+                date=today,
             ),
             DailyQuest(
-                student_id=user_id, quest_type="social", target_count=1, xp_reward=5
+                student_id=user_id,
+                quest_type="social",
+                target_count=1,
+                xp_reward=5,
+                coin_reward=1,
+                date=today,
             ),
             DailyQuest(
-                student_id=user_id, quest_type="streak", target_count=1, xp_reward=3
+                student_id=user_id,
+                quest_type="streak",
+                target_count=1,
+                xp_reward=3,
+                coin_reward=1,
+                date=today,
             ),
         ]
 
@@ -320,11 +427,14 @@ class GamificationService:
         return quests
 
     @staticmethod
+    @transaction.atomic
     def update_quest_progress(user_id, quest_type, increment=1):
+        from apps.notifications.services import NotificationService
+
         today = date.today()
 
         try:
-            quest = DailyQuest.objects.get(
+            quest = DailyQuest.objects.select_for_update().get(
                 student_id=user_id, quest_type=quest_type, date=today
             )
         except DailyQuest.DoesNotExist:
@@ -346,6 +456,11 @@ class GamificationService:
                 f"Kunlik vazifa: {quest.get_quest_type_display()}",
             )
 
+            if hasattr(quest, "coin_reward") and quest.coin_reward:
+                GamificationService.award_coins(
+                    user_id, quest.coin_reward, f"Kunlik vazifa bonus"
+                )
+
             all_completed = not DailyQuest.objects.filter(
                 student_id=user_id, date=today, is_completed=False
             ).exists()
@@ -354,5 +469,108 @@ class GamificationService:
                 GamificationService.award_xp(
                     user_id, 50, "daily_jackpot", "Barcha kunlik vazifalarni bajarish"
                 )
+                GamificationService.award_coins(user_id, 10, "Kunlik jackpot bonus")
 
         return quest
+
+    @staticmethod
+    @transaction.atomic
+    def buy_streak_freeze(user_id):
+        price = 50
+        result = GamificationService.spend_coins(
+            user_id, price, "Streak freeze sotib olish"
+        )
+
+        if result["success"]:
+            streak, _ = Streak.objects.get_or_create(student_id=user_id)
+            streak.streak_freeze_count += 1
+            streak.save()
+
+        return result
+
+    @staticmethod
+    def get_shop_items():
+        return [
+            {
+                "id": "streak_freeze",
+                "name": "Streak Freeze",
+                "description": "Kunlik streak buzilishdan saqlaydi",
+                "price": 50,
+                "type": "consumable",
+                "icon": "snowflake",
+            },
+            {
+                "id": "xp_boost_small",
+                "name": "XP Boost (Kichik)",
+                "description": "30 daqiqa davomida 2x XP",
+                "price": 100,
+                "type": "consumable",
+                "duration_minutes": 30,
+                "multiplier": 2,
+                "icon": "bolt",
+            },
+            {
+                "id": "xp_boost_large",
+                "name": "XP Boost (Katta)",
+                "description": "60 daqiqa davomida 3x XP",
+                "price": 200,
+                "type": "consumable",
+                "duration_minutes": 60,
+                "multiplier": 3,
+                "icon": "bolt",
+            },
+            {
+                "id": "avatar_frame",
+                "name": "Avatar Ramkasi",
+                "description": "Profilingizda maxsus ramka",
+                "price": 150,
+                "type": "permanent",
+                "icon": "frame",
+            },
+        ]
+
+    @staticmethod
+    @transaction.atomic
+    def purchase_item(user_id, item_id):
+        items = GamificationService.get_shop_items()
+        item = next((i for i in items if i["id"] == item_id), None)
+
+        if not item:
+            return {"success": False, "error": "Mahsulot topilmadi"}
+
+        result = GamificationService.spend_coins(
+            user_id, item["price"], f"{item['name']} sotib olish"
+        )
+
+        if not result["success"]:
+            return result
+
+        if item["id"] == "streak_freeze":
+            streak, _ = Streak.objects.get_or_create(student_id=user_id)
+            streak.streak_freeze_count += 1
+            streak.save()
+
+        return {
+            "success": True,
+            "item": item,
+            "coins_spent": item["price"],
+            "remaining_coins": result["remaining_coins"],
+        }
+
+    @staticmethod
+    def get_randomized_questions(quiz, limit=None):
+        questions = list(quiz.questions.filter(is_active=True))
+
+        if quiz.randomize_questions:
+            random.shuffle(questions)
+
+        if limit:
+            questions = questions[:limit]
+
+        if quiz.randomize_answers:
+            for question in questions:
+                choices = list(question.choices.all())
+                random.shuffle(choices)
+                question._cached_choices = choices
+
+        return questions

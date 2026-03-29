@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+
 from .models import Course, Lesson, LessonProgress, CourseCompletion
 
 
@@ -13,8 +14,11 @@ class LessonInline(admin.TabularInline):
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = [
-        "title", "classroom", "teacher",
-        "lessons_count", "published_badge",
+        "title",
+        "classroom",
+        "teacher",
+        "lessons_count",
+        "published_badge",
     ]
     list_filter = ["is_published", "classroom"]
     search_fields = ["title", "teacher__username"]
@@ -26,26 +30,33 @@ class CourseAdmin(admin.ModelAdmin):
         if obj.is_published:
             return format_html(
                 '<span style="background:#10b981;color:#fff;padding:2px 10px;'
-                'border-radius:20px;font-size:11px;font-weight:700;">✓ Nashr qilingan</span>'
+                'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
+                "Nashr qilingan",
             )
         return format_html(
             '<span style="background:#e5e7eb;color:#6b7280;padding:2px 10px;'
-            'border-radius:20px;font-size:11px;font-weight:700;">Qoralama</span>'
+            'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
+            "Qoralama",
         )
 
     @admin.display(description="Darslar")
     def lessons_count(self, obj):
         count = obj.lessons.count()
         return format_html(
-            '<span style="color:#6366f1;font-weight:700;">📚 {}</span>', count
+            '<span style="color:#6366f1;font-weight:700;">{}</span>',
+            count,
         )
 
 
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     list_display = [
-        "title", "course", "type_badge",
-        "order", "xp_reward_display", "published_badge",
+        "title",
+        "course",
+        "type_badge",
+        "order",
+        "xp_reward_display",
+        "published_badge",
     ]
     list_filter = ["lesson_type", "is_published"]
     search_fields = ["title", "course__title"]
@@ -55,37 +66,46 @@ class LessonAdmin(admin.ModelAdmin):
     @admin.display(description="Turi")
     def type_badge(self, obj):
         colors = {
-            "video":    ("#ef4444", "🎬"),
-            "text":     ("#6366f1", "📝"),
-            "quiz":     ("#10b981", "❓"),
-            "task":     ("#f59e0b", "📋"),
-            "resource": ("#06b6d4", "📎"),
+            "video": ("#ef4444", "video"),
+            "text": ("#6366f1", "text"),
+            "interactive": ("#10b981", "interactive"),
         }
-        color, icon = colors.get(obj.lesson_type, ("#6b7280", "📄"))
+        color, label = colors.get(obj.lesson_type, ("#6b7280", obj.lesson_type))
         return format_html(
             '<span style="background:{};color:#fff;padding:2px 9px;'
-            'border-radius:20px;font-size:11px;font-weight:700;">{} {}</span>',
-            color, icon, obj.get_lesson_type_display()
+            'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
+            color,
+            label.title(),
         )
 
     @admin.display(description="XP mukofot")
     def xp_reward_display(self, obj):
         return format_html(
-            '<span style="color:#f59e0b;font-weight:700;">⭐ {}</span>', obj.xp_reward
+            '<span style="color:#f59e0b;font-weight:700;">{}</span>',
+            obj.xp_reward,
         )
 
     @admin.display(description="Holat")
     def published_badge(self, obj):
         if obj.is_published:
-            return format_html('<span style="color:#10b981;font-weight:700;">✓ Faol</span>')
-        return format_html('<span style="color:#9ca3af;">— Qoralama</span>')
+            return format_html(
+                '<span style="color:#10b981;font-weight:700;">{}</span>',
+                "Faol",
+            )
+        return format_html(
+            '<span style="color:#9ca3af;">{}</span>',
+            "Qoralama",
+        )
 
 
 @admin.register(LessonProgress)
 class LessonProgressAdmin(admin.ModelAdmin):
     list_display = [
-        "student", "lesson", "progress_bar",
-        "completion_status", "completed_at",
+        "student",
+        "lesson",
+        "progress_bar",
+        "completion_status",
+        "completed_at",
     ]
     list_filter = ["is_completed", "lesson__course"]
     search_fields = ["student__username"]
@@ -107,14 +127,22 @@ class LessonProgressAdmin(admin.ModelAdmin):
             '</div>'
             '<span style="font-size:12px;color:#6b7280;">{}%</span>'
             '</div>',
-            pct, color, pct
+            pct,
+            color,
+            pct,
         )
 
     @admin.display(description="Holat")
     def completion_status(self, obj):
         if obj.is_completed:
-            return format_html('<span style="color:#10b981;font-weight:700;">✓ Yakunlandi</span>')
-        return format_html('<span style="color:#f59e0b;">⏳ Jarayonda</span>')
+            return format_html(
+                '<span style="color:#10b981;font-weight:700;">{}</span>',
+                "Yakunlandi",
+            )
+        return format_html(
+            '<span style="color:#f59e0b;">{}</span>',
+            "Jarayonda",
+        )
 
 
 @admin.register(CourseCompletion)
@@ -132,6 +160,6 @@ class CourseCompletionAdmin(admin.ModelAdmin):
     @admin.display(description="Olingan XP")
     def xp_earned_display(self, obj):
         return format_html(
-            '<span style="color:#f59e0b;font-weight:700;">⭐ {} XP</span>',
-            obj.xp_earned
+            '<span style="color:#f59e0b;font-weight:700;">{} XP</span>',
+            obj.xp_earned,
         )

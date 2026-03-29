@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+
 from .models import Quiz, Question, AnswerChoice, QuizAttempt, StudentAnswer
 
 
@@ -19,8 +20,12 @@ class QuestionInline(admin.TabularInline):
 @admin.register(Quiz)
 class QuizAdmin(admin.ModelAdmin):
     list_display = [
-        "title", "classroom", "created_by",
-        "type_badge", "questions_count", "active_status",
+        "title",
+        "classroom",
+        "created_by",
+        "type_badge",
+        "questions_count",
+        "active_status",
     ]
     list_filter = ["quiz_type", "is_active", "classroom"]
     search_fields = ["title", "created_by__username"]
@@ -31,36 +36,46 @@ class QuizAdmin(admin.ModelAdmin):
     def type_badge(self, obj):
         colors = {
             "practice": "#6366f1",
-            "graded":   "#ef4444",
-            "homework": "#f59e0b",
-            "exam":     "#a855f7",
+            "exam": "#ef4444",
+            "challenge": "#f59e0b",
+            "tournament": "#a855f7",
         }
         color = colors.get(obj.quiz_type, "#6b7280")
         return format_html(
             '<span style="background:{};color:#fff;padding:2px 9px;'
             'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
-            color, obj.get_quiz_type_display()
+            color,
+            obj.get_quiz_type_display(),
         )
 
     @admin.display(description="Faol")
     def active_status(self, obj):
         if obj.is_active:
-            return format_html('<span style="color:#10b981;font-weight:700;">✓ Faol</span>')
-        return format_html('<span style="color:#9ca3af;">✗ Nofaol</span>')
+            return format_html(
+                '<span style="color:#10b981;font-weight:700;">{}</span>',
+                "Faol",
+            )
+        return format_html(
+            '<span style="color:#9ca3af;">{}</span>',
+            "Nofaol",
+        )
 
     @admin.display(description="Savollar")
     def questions_count(self, obj):
-        count = obj.questions.count()
         return format_html(
-            '<span style="color:#6366f1;font-weight:700;">❓ {}</span>', count
+            '<span style="color:#6366f1;font-weight:700;">{}</span>',
+            obj.questions.count(),
         )
 
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
     list_display = [
-        "short_text", "quiz", "type_badge",
-        "difficulty_badge", "points",
+        "short_text",
+        "quiz",
+        "type_badge",
+        "difficulty_badge",
+        "points",
     ]
     list_filter = ["question_type", "difficulty", "quiz"]
     search_fields = ["question_text"]
@@ -76,34 +91,43 @@ class QuestionAdmin(admin.ModelAdmin):
     def type_badge(self, obj):
         colors = {
             "multiple_choice": "#6366f1",
-            "true_false":      "#10b981",
-            "short_answer":    "#f59e0b",
+            "true_false": "#10b981",
+            "short_answer": "#f59e0b",
+            "matching": "#06b6d4",
+            "ordering": "#a855f7",
         }
         color = colors.get(obj.question_type, "#6b7280")
         return format_html(
             '<span style="background:{};color:#fff;padding:2px 8px;'
             'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
-            color, obj.get_question_type_display()
+            color,
+            obj.get_question_type_display(),
         )
 
     @admin.display(description="Qiyinlik")
     def difficulty_badge(self, obj):
         configs = {
-            "easy":   ("#10b981", "Oson"),
+            "easy": ("#10b981", "Oson"),
             "medium": ("#f59e0b", "O'rta"),
-            "hard":   ("#ef4444", "Qiyin"),
+            "hard": ("#ef4444", "Qiyin"),
         }
         color, label = configs.get(obj.difficulty, ("#6b7280", obj.difficulty))
         return format_html(
-            '<span style="color:{};font-weight:700;">{}</span>', color, label
+            '<span style="color:{};font-weight:700;">{}</span>',
+            color,
+            label,
         )
 
 
 @admin.register(QuizAttempt)
 class QuizAttemptAdmin(admin.ModelAdmin):
     list_display = [
-        "student", "quiz", "attempt_number",
-        "score_display", "passed_badge", "started_at",
+        "student",
+        "quiz",
+        "attempt_number",
+        "score_display",
+        "passed_badge",
+        "started_at",
     ]
     list_filter = ["is_passed", "quiz"]
     search_fields = ["student__username"]
@@ -125,7 +149,10 @@ class QuizAttemptAdmin(admin.ModelAdmin):
             '</div>'
             '<span style="color:{};font-weight:700;font-size:12px;">{}%</span>'
             '</div>',
-            pct, color, color, pct
+            pct,
+            color,
+            color,
+            pct,
         )
 
     @admin.display(description="Natija")
@@ -133,23 +160,31 @@ class QuizAttemptAdmin(admin.ModelAdmin):
         if obj.is_passed:
             return format_html(
                 '<span style="background:#10b981;color:#fff;padding:2px 10px;'
-                'border-radius:20px;font-size:11px;font-weight:700;">✓ O\'tdi</span>'
+                'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
+                "O'tdi",
             )
         return format_html(
             '<span style="background:#ef4444;color:#fff;padding:2px 10px;'
-            'border-radius:20px;font-size:11px;font-weight:700;">✗ O\'tmadi</span>'
+            'border-radius:20px;font-size:11px;font-weight:700;">{}</span>',
+            "O'tmadi",
         )
 
 
 @admin.register(StudentAnswer)
 class StudentAnswerAdmin(admin.ModelAdmin):
     list_display = [
-        "attempt", "short_question", "correct_badge", "points_earned"
+        "attempt",
+        "short_question",
+        "correct_badge",
+        "points_earned",
     ]
     list_filter = ["is_correct"]
     readonly_fields = [
-        "attempt", "question", "selected_choice",
-        "is_correct", "points_earned",
+        "attempt",
+        "question",
+        "selected_choice",
+        "is_correct",
+        "points_earned",
     ]
     list_per_page = 30
 
@@ -164,5 +199,11 @@ class StudentAnswerAdmin(admin.ModelAdmin):
     @admin.display(description="To'g'ri")
     def correct_badge(self, obj):
         if obj.is_correct:
-            return format_html('<span style="color:#10b981;font-weight:700;font-size:15px;">✓</span>')
-        return format_html('<span style="color:#ef4444;font-weight:700;font-size:15px;">✗</span>')
+            return format_html(
+                '<span style="color:#10b981;font-weight:700;font-size:15px;">{}</span>',
+                "Ha",
+            )
+        return format_html(
+            '<span style="color:#ef4444;font-weight:700;font-size:15px;">{}</span>',
+            "Yo'q",
+        )

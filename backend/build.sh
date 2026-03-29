@@ -1,15 +1,6 @@
-#!/bin/bash
-# Build script for Render.com
+#!/usr/bin/env bash
 
-set -e
+set -o errexit
 
-echo "Installing dependencies..."
-pip install -r requirements/base.txt
-
-echo "Running migrations..."
-python manage.py migrate
-
-echo "Collecting static files..."
+pip install -r requirements.txt
 python manage.py collectstatic --noinput
-
-echo "Build complete!"

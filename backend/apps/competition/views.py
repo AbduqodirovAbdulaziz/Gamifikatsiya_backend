@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
@@ -16,7 +17,8 @@ from .serializers import (
     ChallengeSerializer,
     ChallengeCreateSerializer,
 )
-from apps.quizzes.models import QuizAttempt
+from apps.quizzes.models import Quiz, QuizAttempt
+from apps.users.permissions import IsTeacher
 
 
 def check_challenge_access(challenge, user):
@@ -25,11 +27,32 @@ def check_challenge_access(challenge, user):
     return challenge.challenger == user or challenge.opponent == user
 
 
+def get_verified_quiz_attempt(quiz, student, after=None, before=None, attempt_id=None):
+    queryset = QuizAttempt.objects.filter(quiz=quiz, student=student, is_completed=True)
+
+    if after:
+        queryset = queryset.filter(completed_at__gte=after)
+    if before:
+        queryset = queryset.filter(completed_at__lte=before)
+
+    if attempt_id:
+        return queryset.filter(id=attempt_id).first()
+
+    return queryset.order_by("-percentage", "-completed_at").first()
+
+
 class TournamentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
+        if user.role == "admin" or user.is_staff:
+            return Tournament.objects.all()
         if user.role == "teacher":
             return Tournament.objects.filter(created_by=user)
         return Tournament.objects.filter(
@@ -44,6 +67,15 @@ class TournamentViewSet(viewsets.ModelViewSet):
         return TournamentDetailSerializer
 
     def perform_create(self, serializer):
+        classroom = serializer.validated_data["classroom"]
+        quiz = serializer.validated_data["quiz"]
+
+        if quiz.classroom_id != classroom.id:
+            raise ValidationError({"quiz": "Tanlangan test ushbu sinfga tegishli emas"})
+
+        if self.request.user.role == "teacher" and classroom.teacher != self.request.user:
+            raise PermissionDenied("Siz faqat o'zingizga tegishli sinf uchun turnir yarata olasiz")
+
         serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=["post"])
@@ -114,7 +146,7 @@ class TournamentViewSet(viewsets.ModelViewSet):
     def submit_score(self, request, pk=None):
         tournament = self.get_object()
         user = request.user
-        score = request.data.get("score", 0)
+        attempt_id = request.data.get("attempt_id")
 
         participant = get_object_or_404(
             TournamentParticipant, tournament=tournament, student=user
@@ -126,8 +158,22 @@ class TournamentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        participant.score = score
-        participant.completed_at = timezone.now()
+        attempt_window_start = max(participant.registered_at, tournament.start_time)
+        quiz_attempt = get_verified_quiz_attempt(
+            quiz=tournament.quiz,
+            student=user,
+            after=attempt_window_start,
+            before=tournament.end_time,
+            attempt_id=attempt_id,
+        )
+        if not quiz_attempt:
+            return Response(
+                {"error": "Turnir uchun tasdiqlangan test urinishi topilmadi"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        participant.score = quiz_attempt.percentage
+        participant.completed_at = quiz_attempt.completed_at or timezone.now()
         participant.save()
 
         all_completed = not tournament.participants.filter(
@@ -139,7 +185,13 @@ class TournamentViewSet(viewsets.ModelViewSet):
             tournament.save()
             self._award_prizes(tournament)
 
-        return Response({"message": "Ball qabul qilindi", "score": score})
+        return Response(
+            {
+                "message": "Ball qabul qilindi",
+                "score": participant.score,
+                "attempt_id": str(quiz_attempt.id),
+            }
+        )
 
     def _award_prizes(self, tournament):
         from apps.gamification.services import GamificationService
@@ -169,6 +221,11 @@ class ChallengeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ChallengeSerializer
 
+    def get_permissions(self):
+        if self.action in {"update", "partial_update", "destroy"}:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
         return Challenge.objects.filter(
@@ -183,6 +240,7 @@ class ChallengeViewSet(viewsets.ModelViewSet):
         opponent_id = serializer.validated_data["opponent_id"]
         quiz_id = serializer.validated_data["quiz_id"]
         xp_stake = serializer.validated_data["xp_stake"]
+        quiz = get_object_or_404(Quiz, id=quiz_id, is_active=True)
 
         if str(opponent_id) == str(user.id):
             return Response(
@@ -195,7 +253,7 @@ class ChallengeViewSet(viewsets.ModelViewSet):
         challenge = Challenge.objects.create(
             challenger=user,
             opponent_id=opponent_id,
-            quiz_id=quiz_id,
+            quiz=quiz,
             xp_stake=xp_stake,
             expires_at=expires_at,
         )
@@ -246,13 +304,7 @@ class ChallengeViewSet(viewsets.ModelViewSet):
     def submit_result(self, request, pk=None):
         challenge = self.get_object()
         user = request.user
-        score = request.data.get("score", 0)
-
-        if score < 0:
-            return Response(
-                {"error": "Score manfiy bo'lishi mumkin emas"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        attempt_id = request.data.get("attempt_id")
 
         if challenge.expires_at and timezone.now() > challenge.expires_at:
             return Response(
@@ -265,10 +317,33 @@ class ChallengeViewSet(viewsets.ModelViewSet):
                 {"error": "Challenge yakunlangan"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        quiz_attempt = get_verified_quiz_attempt(
+            quiz=challenge.quiz,
+            student=user,
+            after=challenge.created_at,
+            before=challenge.expires_at,
+            attempt_id=attempt_id,
+        )
+        if not quiz_attempt:
+            return Response(
+                {"error": "Challenge uchun tasdiqlangan test urinishi topilmadi"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ChallengeAttempt.objects.update_or_create(
+            challenge=challenge,
+            student=user,
+            defaults={
+                "quiz_attempt": quiz_attempt,
+                "score": quiz_attempt.percentage,
+                "completed_at": quiz_attempt.completed_at or timezone.now(),
+            },
+        )
+
         if challenge.challenger == user:
-            challenge.challenger_score = score
+            challenge.challenger_score = quiz_attempt.percentage
         elif challenge.opponent == user:
-            challenge.opponent_score = score
+            challenge.opponent_score = quiz_attempt.percentage
         else:
             return Response(
                 {"error": "Siz bu challengeda ishtirok etmaysiz"},
@@ -308,6 +383,7 @@ class ChallengeViewSet(viewsets.ModelViewSet):
                 "message": "Natija qabul qilildi",
                 "challenger_score": challenge.challenger_score,
                 "opponent_score": challenge.opponent_score,
+                "attempt_id": str(quiz_attempt.id),
             }
         )
 

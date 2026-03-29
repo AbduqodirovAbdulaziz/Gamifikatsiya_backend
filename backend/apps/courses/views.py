@@ -15,15 +15,29 @@ from .serializers import (
     CourseCompletionSerializer,
 )
 from apps.classroom.models import Classroom, Enrollment
+from apps.users.permissions import IsTeacher
 
 
 class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
-        if user.role == "teacher":
+        if user.role == "admin" or user.is_staff:
+            queryset = Course.objects.all()
+        elif user.role == "teacher":
             queryset = Course.objects.filter(teacher=user)
+        elif user.role == "parent":
+            queryset = Course.objects.filter(
+                is_published=True,
+                classroom__enrollments__student__parent=user,
+                classroom__enrollments__is_active=True,
+            ).distinct()
         else:
             queryset = Course.objects.filter(
                 is_published=True,
@@ -107,10 +121,23 @@ class LessonViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = LessonSerializer
 
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAuthenticated(), IsTeacher()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
+        if user.role == "admin" or user.is_staff:
+            return Lesson.objects.all()
         if user.role == "teacher":
             return Lesson.objects.filter(course__teacher=user)
+        if user.role == "parent":
+            return Lesson.objects.filter(
+                is_published=True,
+                course__classroom__enrollments__student__parent=user,
+                course__classroom__enrollments__is_active=True,
+            ).distinct()
         return Lesson.objects.filter(
             is_published=True,
             course__classroom__enrollments__student=user,

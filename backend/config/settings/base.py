@@ -4,13 +4,19 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "django-insecure-dev-key-change-in-production"
-)
 
-DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
+def split_env_list(name, default=""):
+    value = os.environ.get(name, default)
+    return [item.strip() for item in value.split(",") if item.strip()]
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    SECRET_KEY = "django-insecure-dev-key-only-for-development"
+
+ALLOWED_HOSTS = split_env_list("ALLOWED_HOSTS", "*")
 
 INSTALLED_APPS = [
     "jazzmin",
@@ -71,8 +77,12 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.environ.get("DB_NAME", BASE_DIR / "db.sqlite3"),
+        "USER": os.environ.get("DB_USER", ""),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+        "HOST": os.environ.get("DB_HOST", ""),
+        "PORT": os.environ.get("DB_PORT", ""),
     }
 }
 
@@ -146,14 +156,15 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8081",
-]
+CORS_ALLOWED_ORIGINS = split_env_list(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://localhost:8000",
+)
 render_url = os.environ.get("RENDER_EXTERNAL_URL")
-if render_url:
-    CORS_ALLOWED_ORIGINS.append(render_url)
+frontend_url = os.environ.get("FRONTEND_URL")
+for extra_origin in (render_url, frontend_url):
+    if extra_origin and extra_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(extra_origin)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -174,6 +185,7 @@ JAZZMIN_SETTINGS = {
     "site_title": "EduGame Admin",
     "site_header": "EduGame",
     "site_brand": "EduGame",
+    "default_theme_mode": "light",
     "welcome_sign": "EduGame boshqaruv paneliga xush kelibsiz!",
     "copyright": "EduGame",
     "user_avatar": None,
@@ -251,7 +263,6 @@ JAZZMIN_UI_TWEAKS = {
     "sidebar_nav_legacy_style": False,
     "sidebar_nav_flat_style": False,
     "theme": "flatly",
-    "dark_mode_theme": None,
     "button_classes": {
         "primary": "btn-primary",
         "secondary": "btn-outline-secondary",

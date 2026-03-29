@@ -71,6 +71,7 @@ class XPTransaction(models.Model):
     TRANSACTION_TYPES = [
         ("quiz_complete", "Test yakunlandi"),
         ("lesson_complete", "Dars yakunlandi"),
+        ("course_complete", "Kurs yakunlandi"),
         ("badge_earn", "Badge olindi"),
         ("streak_bonus", "Streak bonus"),
         ("challenge_win", "Challenge g'alabasi"),
@@ -79,6 +80,8 @@ class XPTransaction(models.Model):
         ("penalty", "Jarima"),
         ("tournament_win", "Turnir g'alabasi"),
         ("referral", "Do'st taklifi"),
+        ("quest_complete", "Vazifa bajarildi"),
+        ("daily_jackpot", "Kunlik jackpot"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -99,6 +102,10 @@ class XPTransaction(models.Model):
         verbose_name = "XP Tranzaksiya"
         verbose_name_plural = "XP Tranzaksiyalari"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["student", "-created_at"]),
+            models.Index(fields=["transaction_type", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.student.username}: {self.amount} XP - {self.description}"
@@ -176,6 +183,7 @@ class DailyQuest(models.Model):
     target_count = models.IntegerField(default=1)
     current_count = models.IntegerField(default=0)
     xp_reward = models.IntegerField(default=10)
+    coin_reward = models.IntegerField(default=1)
     is_completed = models.BooleanField(default=False)
     date = models.DateField()
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -185,6 +193,10 @@ class DailyQuest(models.Model):
         verbose_name = "Kunlik vazifa"
         verbose_name_plural = "Kunlik vazifalar"
         unique_together = ["student", "quest_type", "date"]
+        indexes = [
+            models.Index(fields=["student", "date"]),
+            models.Index(fields=["date", "is_completed"]),
+        ]
 
     def __str__(self):
         return f"{self.student.username} - {self.get_quest_type_display()}"
@@ -205,3 +217,42 @@ class LevelTitle(models.Model):
 
     def __str__(self):
         return f"Level {self.level}: {self.title}"
+
+
+class CoinTransaction(models.Model):
+    TRANSACTION_TYPES = [
+        ("earned", "Ishtirok"),
+        ("spent", "Sarflangan"),
+        ("bonus", "Bonus"),
+        ("refund", "Qaytarilgan"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="coin_transactions",
+    )
+    amount = models.IntegerField()
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    description = models.CharField(max_length=200)
+    balance_after = models.IntegerField(default=0)
+    related_object_id = models.UUIDField(null=True, blank=True)
+    related_object_type = models.CharField(max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "gamification_coin_transaction"
+        verbose_name = "Coin Tranzaksiya"
+        verbose_name_plural = "Coin Tranzaksiyalari"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["student", "-created_at"]),
+            models.Index(fields=["transaction_type", "-created_at"]),
+        ]
+
+    def __str__(self):
+        sign = "+" if self.transaction_type in ["earned", "bonus"] else "-"
+        return (
+            f"{self.student.username}: {sign}{self.amount} Coins - {self.description}"
+        )
