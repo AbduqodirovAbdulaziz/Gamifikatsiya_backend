@@ -31,15 +31,20 @@ EduGame - bu gamifikatsiya elementlari asosida ishlaydigan zamonaviy ta'lim plat
 
 ## 🚀 Tezkor Boshlash
 
-### Backend (Render.com)
+### Backend (Render.com) — serverga faqat backend
+
+GitHub repositoriyada `backend/` va `mobile/` birga turishi normal: bitta repoga push qilasiz. **Render serverda faqat `backend` papkasini** ishlatadi (`render.yaml` ichida `rootDir: backend`). `mobile` kodlari build yoki containerga kiritilmaydi.
+
+- Blueprint: repo ildizidagi `render.yaml`, branch `main`.
+- Yoki oddiy **Web Service** ochgan bo‘lsangiz: **Settings → Root Directory** = `backend` bo‘lishi shart.
+
+Batafsil: [backend/README.md](backend/README.md) (Render Deploy bo‘limi).
 
 ```bash
-# GitHub ga yuklash
-git init
+# GitHub ga yuklash (butun monorepo; server yana ham faqat backendni oladi)
 git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOU/edugame.git
-git push -u origin main
+git commit -m "Your message"
+git push origin main
 ```
 
 Keyin [Render.com](https://render.com) da deploy qiling.

@@ -1,3 +1,4 @@
+# Monorepo: GitHubda mobile/ ham bor, lekin bu servis faqat backend/ ni build va run qiladi.
 services:
   - type: web
     name: gamifikatsiya-backend

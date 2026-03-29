@@ -4,9 +4,11 @@ Django REST Framework bilan yozilgan backend API.
 
 ## Render Deploy
 
+**Muhim:** Loyiha monorepo (`backend` + `mobile`). Serverga (Render) chiqadigan narsa **faqat bu `backend/` papka** — `mobile` alohida Flutter loyiha sifatida quriladi, Render konteyneriga kirmaydi.
+
 ### Blueprint orqali deploy
 
-Repo ichida `backend` va `mobile` birga turadi, lekin Render faqat `backend` papkani deploy qiladi. Buning uchun repo ildizidagi `render.yaml` ishlatiladi.
+Repo ichida `backend` va `mobile` birga turishi mumkin; Render `rootDir: backend` tufayli **faqat `backend` papkani** build qiladi. Buning uchun repo ildizidagi `render.yaml` ishlatiladi.
 
 1. [Render.com](https://render.com) ga kiring.
 2. `New +` -> `Blueprint` ni tanlang.
@@ -23,6 +25,10 @@ Repo ichida `backend` va `mobile` birga turadi, lekin Render faqat `backend` pap
 - `mobile` papkasini deployga qo'shmaydi.
 - `bash ./build.sh` orqali backendni yig'adi.
 - `daphne` bilan ASGI serverni ishga tushiradi.
+
+### Web Service ni qo'lda yaratgan bo'lsangiz (Blueprint emas)
+
+`New +` → `Web Service` → GitHub reponi tanlang. Keyin **Settings → Root Directory** maydoniga `backend` yozing (bo'sh qoldirmang). Shunda build va start buyrug'i `backend/` ichida ishlaydi; `mobile` ishtirok etmaydi.
 
 ### PostgreSQL yaratish
 
