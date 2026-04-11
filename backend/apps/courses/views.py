@@ -66,7 +66,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         return context
 
     def perform_create(self, serializer):
-        classroom_id = self.request.data.get("classroom_id")
+        classroom_id = self.request.data.get("classroom_id") or self.request.data.get("classroom")
         classroom = get_object_or_404(
             Classroom, id=classroom_id, teacher=self.request.user
         )
