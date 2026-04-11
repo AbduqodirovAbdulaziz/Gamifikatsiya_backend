@@ -39,10 +39,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     )
     password_confirm = serializers.CharField(write_only=True)
     role = serializers.ChoiceField(
-        choices=["student", "teacher"],
+        choices=["student", "teacher", "parent"],
         default="student",
         error_messages={
-            "invalid_choice": "Role faqat 'student' yoki 'teacher' bo'lishi mumkin"
+            "invalid_choice": "Role faqat 'student', 'teacher' yoki 'parent' bo'lishi mumkin"
         },
     )
 
@@ -96,9 +96,32 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
+class ParentProfileSerializer(serializers.SerializerMethodField):
+    def to_representation(self, value):
+        user = self.parent.instance
+        if user.role != "parent":
+            return None
+        
+        children = user.children.all()
+        return {
+            "total_children": children.count(),
+            "children": [
+                {
+                    "id": child.id,
+                    "username": child.username,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "avatar": child.avatar.url if child.avatar else None,
+                }
+                for child in children
+            ]
+        }
+
+
 class UserSerializer(serializers.ModelSerializer):
     student_profile = StudentProfileSerializer(read_only=True)
     teacher_profile = TeacherProfileSerializer(read_only=True)
+    parent_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -115,10 +138,30 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "student_profile",
             "teacher_profile",
+            "parent_profile",
             "is_online",
             "last_seen",
         ]
         read_only_fields = ["id", "email", "role", "is_online", "last_seen"]
+
+    def get_parent_profile(self, obj):
+        if obj.role != "parent":
+            return None
+        
+        children = obj.children.all()
+        return {
+            "total_children": children.count(),
+            "children": [
+                {
+                    "id": str(child.id),
+                    "username": child.username,
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "avatar": child.avatar.url if child.avatar else None,
+                }
+                for child in children
+            ]
+        }
 
 
 class UserPublicSerializer(serializers.ModelSerializer):

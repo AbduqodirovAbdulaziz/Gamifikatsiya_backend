@@ -12,6 +12,9 @@ from .views import (
     ParentChildListView,
     ParentChildDetailView,
     ParentChildProgressView,
+    ChildSearchView,
+    ChildLinkView,
+    StudentProgressView,
 )
 
 urlpatterns = [
@@ -23,6 +26,8 @@ urlpatterns = [
     path("avatar/", AvatarUploadView.as_view(), name="avatar-upload"),
     path("fcm-token/", FCMTokenView.as_view(), name="fcm-token"),
     path("children/", ParentChildListView.as_view(), name="parent-children"),
+    path("children/search/", ChildSearchView.as_view(), name="children-search"),
+    path("children/link/", ChildLinkView.as_view(), name="children-link"),
     path(
         "children/<uuid:child_id>/",
         ParentChildDetailView.as_view(),
@@ -32,5 +37,10 @@ urlpatterns = [
         "children/<uuid:child_id>/progress/",
         ParentChildProgressView.as_view(),
         name="parent-child-progress",
+    ),
+    path(
+        "students/<uuid:student_id>/progress/",
+        StudentProgressView.as_view(),
+        name="student-progress",
     ),
 ]

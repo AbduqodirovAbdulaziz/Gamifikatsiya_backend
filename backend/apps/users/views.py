@@ -286,33 +286,116 @@ class ParentChildProgressView(generics.GenericAPIView):
         child = get_object_or_404(get_parent_children_queryset(request.user), id=child_id)
 
         from apps.gamification.services import GamificationService
-        from apps.quizzes.models import QuizAttempt
-        from apps.courses.models import CourseCompletion, LessonProgress
 
+        # Use shared progress summary service
+        progress = GamificationService.get_progress_summary(child_id)
+        
+        return Response({
+            "child_id": str(child.id),
+            "username": child.username,
+            **progress,  # Include all shared progress data
+        })
+
+
+class ChildSearchView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated, IsParent]
+    serializer_class = UserPublicSerializer
+
+    def get_queryset(self):
+        query = self.request.query_params.get("q", "")
+        # Search for students not already linked to this parent
+        linked_children = get_parent_children_queryset(self.request.user)
+        linked_ids = linked_children.values_list("id", flat=True)
+        
+        results = User.objects.filter(role="student").exclude(id__in=linked_ids)
+        
+        if query:
+            results = results.filter(
+                models.Q(username__icontains=query)
+                | models.Q(first_name__icontains=query)
+                | models.Q(last_name__icontains=query)
+                | models.Q(email__icontains=query)
+            )
+        
+        return results[:20]  # Limit to 20 results
+
+
+class ChildLinkView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated, IsParent]
+
+    def create(self, request, *args, **kwargs):
+        child_id = request.data.get("child_id")
+        
+        if not child_id:
+            return Response(
+                {"error": "child_id talab qilinadi"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
-            profile = child.student_profile
-            xp_progress = GamificationService.get_xp_progress(profile.xp_points)
-        except StudentProfile.DoesNotExist:
-            profile = None
-            xp_progress = GamificationService.get_xp_progress(0)
-
-        completions = CourseCompletion.objects.filter(student=child).count()
-        lesson_progress = LessonProgress.objects.filter(
-            student=child, is_completed=True
-        ).count()
-
-        quiz_attempts = QuizAttempt.objects.filter(student=child, is_completed=True)
-        avg_score = quiz_attempts.aggregate(avg=models.Avg("percentage"))["avg"] or 0
-
+            child = User.objects.get(id=child_id, role="student")
+        except User.DoesNotExist:
+            return Response(
+                {"error": "O'quvchi topilmadi"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if already linked
+        if child.parent_id == request.user.id:
+            return Response(
+                {"error": "Bu o'quvchi allaqachon bog'langan"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        child.parent = request.user
+        child.save()
+        
         return Response(
             {
-                "child_id": str(child.id),
-                "username": child.username,
-                "xp_progress": xp_progress,
-                "courses_completed": completions,
-                "lessons_completed": lesson_progress,
-                "total_quizzes": quiz_attempts.count(),
-                "average_score": round(avg_score, 1),
-                "daily_quests_completed": 0,
-            }
+                "message": "O'quvchi muvaffaqiyatli bog'landi",
+                "child": UserPublicSerializer(child).data
+            },
+            status=status.HTTP_201_CREATED
         )
+
+
+class StudentProgressView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, student_id):
+        from apps.gamification.services import GamificationService
+        from apps.classroom.models import Enrollment
+
+        student = get_object_or_404(User, id=student_id, role="student")
+
+        # Permission check: teacher must be in student's classroom, or parent
+        if request.user.role == "teacher":
+            # Check if teacher has this student in any classroom
+            has_access = Enrollment.objects.filter(
+                student=student,
+                classroom__teacher=request.user,
+                is_active=True,
+                is_approved=True,
+            ).exists()
+            if not has_access:
+                return Response(
+                    {"error": "Bu o'quvchiga ruxsat yo'q"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        elif request.user.role == "parent":
+            # Check if this is parent's child
+            if student.parent_id != request.user.id:
+                return Response(
+                    {"error": "Bu o'quvchiga ruxsat yo'q"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        else:
+            return Response(
+                {"error": "Ruxsat yo'q"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Get shared progress summary
+        progress_data = GamificationService.get_progress_summary(student_id)
+
+        return Response(progress_data)

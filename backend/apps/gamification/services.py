@@ -574,3 +574,88 @@ class GamificationService:
                 question._cached_choices = choices
 
         return questions
+
+    @staticmethod
+    def get_progress_summary(student_id):
+        """
+        Returns shared progress summary contract for parent/teacher views.
+        Includes: gamification, quiz_stats, courses_progress, badges, recent_activities
+        """
+        from apps.users.models import StudentProfile
+        from apps.courses.models import CourseCompletion, LessonProgress
+        from apps.quizzes.models import QuizAttempt
+        from django.db.models import Avg, Count
+
+        try:
+            profile = StudentProfile.objects.get(user_id=student_id)
+        except StudentProfile.DoesNotExist:
+            profile = None
+
+        # Gamification data
+        gamification_data = {
+            "xp_points": profile.xp_points if profile else 0,
+            "level": profile.level if profile else 1,
+            "coins": profile.coins if profile else 0,
+            "streak_days": profile.streak_days if profile else 0,
+        }
+
+        # Quiz stats
+        quiz_attempts = QuizAttempt.objects.filter(
+            student_id=student_id, is_completed=True
+        )
+        quiz_stats = {
+            "total_quizzes": quiz_attempts.count(),
+            "average_score": float(
+                quiz_attempts.aggregate(avg=Avg("percentage"))["avg"] or 0
+            ),
+            "total_correct_answers": profile.total_correct_answers if profile else 0,
+        }
+
+        # Course progress
+        courses_completed = CourseCompletion.objects.filter(
+            student_id=student_id
+        ).count()
+        lessons_completed = LessonProgress.objects.filter(
+            student_id=student_id, is_completed=True
+        ).count()
+        courses_progress = {
+            "courses_completed": courses_completed,
+            "lessons_completed": lessons_completed,
+        }
+
+        # Badges
+        badges = UserBadge.objects.filter(student_id=student_id).select_related(
+            "badge"
+        )
+        badges_data = [
+            {
+                "id": str(badge.id),
+                "name": badge.badge.name,
+                "icon": badge.badge.icon.url if badge.badge.icon else None,
+                "rarity": badge.badge.rarity,
+                "earned_at": badge.earned_at.isoformat(),
+            }
+            for badge in badges
+        ]
+
+        # Recent activities (last 5 completed quizzes)
+        recent_attempts = quiz_attempts.order_by("-completed_at")[:5]
+        recent_activities = [
+            {
+                "type": "quiz_completed",
+                "title": attempt.quiz.title if attempt.quiz else "Noma'lum",
+                "score": attempt.percentage,
+                "completed_at": attempt.completed_at.isoformat()
+                if attempt.completed_at
+                else None,
+            }
+            for attempt in recent_attempts
+        ]
+
+        return {
+            "gamification": gamification_data,
+            "quiz_stats": quiz_stats,
+            "courses_progress": courses_progress,
+            "badges": badges_data,
+            "recent_activities": recent_activities,
+        }

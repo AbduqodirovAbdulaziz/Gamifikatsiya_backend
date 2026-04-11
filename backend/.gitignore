@@ -76,8 +76,11 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments (mahalliy maxfiy o'zgaruvchilar; .env.example repoda qoladi)
 .env
+.env.local
+.env.*.local
+!.env.example
 .venv
 env/
 venv/
