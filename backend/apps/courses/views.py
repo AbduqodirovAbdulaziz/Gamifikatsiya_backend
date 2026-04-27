@@ -35,12 +35,14 @@ class CourseViewSet(viewsets.ModelViewSet):
         elif user.role == "parent":
             queryset = Course.objects.filter(
                 is_published=True,
+                classroom__is_active=True,
                 classroom__enrollments__student__parent=user,
                 classroom__enrollments__is_active=True,
             ).distinct()
         else:
             queryset = Course.objects.filter(
                 is_published=True,
+                classroom__is_active=True,
                 classroom__enrollments__student=user,
                 classroom__enrollments__is_active=True,
             ).distinct()
@@ -102,6 +104,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         serializer = LessonSerializer(lessons, many=True, context={"request": request})
         return Response(serializer.data)
 
+
     @action(detail=False, methods=["get"])
     def my_courses(self, request):
         user = request.user
@@ -110,6 +113,7 @@ class CourseViewSet(viewsets.ModelViewSet):
         else:
             courses = Course.objects.filter(
                 is_published=True,
+                classroom__is_active=True,
                 classroom__enrollments__student=user,
                 classroom__enrollments__is_active=True,
             ).distinct()
@@ -135,11 +139,15 @@ class LessonViewSet(viewsets.ModelViewSet):
         if user.role == "parent":
             return Lesson.objects.filter(
                 is_published=True,
+                course__is_published=True,
+                course__classroom__is_active=True,
                 course__classroom__enrollments__student__parent=user,
                 course__classroom__enrollments__is_active=True,
             ).distinct()
         return Lesson.objects.filter(
             is_published=True,
+            course__is_published=True,
+            course__classroom__is_active=True,
             course__classroom__enrollments__student=user,
             course__classroom__enrollments__is_active=True,
         ).distinct()
@@ -153,6 +161,12 @@ class LessonViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         lesson = self.get_object()
         user = request.user
+
+        if user.role != "student":
+            return Response(
+                {"error": "Faqat o'quvchilar progressni o'zgartirishi mumkin"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         progress, created = LessonProgress.objects.get_or_create(
             student=user, lesson=lesson, defaults={"progress_percentage": 100}
@@ -208,6 +222,7 @@ class LessonViewSet(viewsets.ModelViewSet):
                     coin_earned=course.coin_reward,
                 )
 
+
                 from apps.gamification.services import GamificationService
 
                 GamificationService.award_xp(
@@ -222,6 +237,13 @@ class LessonViewSet(viewsets.ModelViewSet):
     def update_progress(self, request, pk=None):
         lesson = self.get_object()
         user = request.user
+
+        if user.role != "student":
+            return Response(
+                {"error": "Faqat o'quvchilar progressni o'zgartirishi mumkin"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         percentage = request.data.get("progress_percentage", 0)
 
         progress, _ = LessonProgress.objects.get_or_create(

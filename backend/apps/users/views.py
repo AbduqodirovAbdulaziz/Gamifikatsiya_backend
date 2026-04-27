@@ -1,7 +1,10 @@
+import logging
+
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -23,6 +26,7 @@ from .serializers import (
 from .permissions import IsOwner, IsParent
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def get_parent_children_queryset(parent_user):
@@ -300,28 +304,38 @@ class ParentChildProgressView(generics.GenericAPIView):
 class ChildSearchView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsParent]
     serializer_class = UserPublicSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "child_search"
 
     def get_queryset(self):
-        query = self.request.query_params.get("q", "")
-        # Search for students not already linked to this parent
+        # Backward compatible query support for mobile/web clients.
+        query = (
+            self.request.query_params.get("q")
+            or self.request.query_params.get("search")
+            or ""
+        ).strip()
+
+        if len(query) < 3:
+            return User.objects.none()
+
+        # Search only unlinked students not already linked to this parent.
         linked_children = get_parent_children_queryset(self.request.user)
         linked_ids = linked_children.values_list("id", flat=True)
         
-        results = User.objects.filter(role="student").exclude(id__in=linked_ids)
-        
-        if query:
-            results = results.filter(
-                models.Q(username__icontains=query)
-                | models.Q(first_name__icontains=query)
-                | models.Q(last_name__icontains=query)
-                | models.Q(email__icontains=query)
-            )
+        results = (
+            User.objects.filter(role="student", parent__isnull=True)
+            .exclude(id__in=linked_ids)
+            .filter(models.Q(username__istartswith=query))
+            .order_by("username")
+        )
         
         return results[:20]  # Limit to 20 results
 
 
 class ChildLinkView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, IsParent]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "child_link"
 
     def create(self, request, *args, **kwargs):
         child_id = request.data.get("child_id")
@@ -345,6 +359,19 @@ class ChildLinkView(generics.CreateAPIView):
             return Response(
                 {"error": "Bu o'quvchi allaqachon bog'langan"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Security: block parent takeover of an already linked child.
+        if child.parent_id and child.parent_id != request.user.id:
+            logger.warning(
+                "Blocked child relink attempt: parent=%s child=%s current_parent=%s",
+                request.user.id,
+                child.id,
+                child.parent_id,
+            )
+            return Response(
+                {"error": "Bu o'quvchi boshqa ota-onaga bog'langan"},
+                status=status.HTTP_409_CONFLICT,
             )
         
         child.parent = request.user

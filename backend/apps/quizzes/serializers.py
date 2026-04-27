@@ -5,7 +5,7 @@ from .models import Quiz, Question, AnswerChoice, QuizAttempt, StudentAnswer
 class AnswerChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerChoice
-        fields = ["id", "choice_text", "order"]
+        fields = ["id", "choice_text", "is_correct", "order"]
         read_only_fields = ["id"]
 
 
@@ -29,10 +29,11 @@ class QuestionSerializer(serializers.ModelSerializer):
             "difficulty",
             "points",
             "time_limit_seconds",
+            "explanation",
             "order",
             "choices",
         ]
-        read_only_fields = ["id", "explanation"]
+        read_only_fields = ["id"]
 
 
 class QuestionSerializerForStudent(serializers.ModelSerializer):
@@ -55,10 +56,12 @@ class QuestionSerializerForStudent(serializers.ModelSerializer):
 
 class QuestionCreateSerializer(serializers.ModelSerializer):
     choices = AnswerChoiceSerializer(many=True, required=False)
+    quiz = serializers.CharField(write_only=True, help_text="Quiz ID")
 
     class Meta:
         model = Question
         fields = [
+            "quiz",
             "question_text",
             "question_type",
             "image",
@@ -72,6 +75,8 @@ class QuestionCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         choices_data = validated_data.pop("choices", [])
+        # Remove quiz from validated_data as it's handled in the view
+        validated_data.pop("quiz", None)
         question = Question.objects.create(**validated_data)
         for choice_data in choices_data:
             AnswerChoice.objects.create(question=question, **choice_data)

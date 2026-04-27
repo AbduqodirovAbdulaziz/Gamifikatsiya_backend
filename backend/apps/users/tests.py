@@ -276,3 +276,79 @@ class ApiRegressionTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["child_id"], str(child.id))
+
+    def test_parent_cannot_take_over_child_linked_to_other_parent(self):
+        parent_one = create_user("parent_one", "parent")
+        parent_two = create_user("parent_two", "parent")
+        child = create_user("linked_child", "student", parent=parent_one)
+
+        self.client.force_authenticate(parent_two)
+        response = self.client.post(
+            "/api/v1/children/link/",
+            {"child_id": str(child.id)},
+            format="json",
+        )
+
+        child.refresh_from_db()
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(child.parent_id, parent_one.id)
+
+    def test_parent_can_link_unlinked_child(self):
+        parent = create_user("new_parent", "parent")
+        child = create_user("unlinked_child", "student")
+
+        self.client.force_authenticate(parent)
+        response = self.client.post(
+            "/api/v1/children/link/",
+            {"child_id": str(child.id)},
+            format="json",
+        )
+
+        child.refresh_from_db()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(child.parent_id, parent.id)
+
+    def test_child_search_supports_search_param_and_hides_linked_students(self):
+        parent = create_user("search_parent", "parent")
+        linked_child = create_user("alpha_linked", "student", parent=parent)
+        unlinked_child = create_user("alpha_unlinked", "student")
+
+        self.client.force_authenticate(parent)
+        response = self.client.get(
+            "/api/v1/children/search/",
+            {"search": "alpha"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = response.data.get("results", response.data)
+        ids = {item["id"] for item in results}
+        self.assertIn(str(unlinked_child.id), ids)
+        self.assertNotIn(str(linked_child.id), ids)
+
+    def test_parent_cannot_mutate_lesson_progress(self):
+        parent = create_user("parent_progress", "parent")
+        child = create_user("parent_progress_child", "student", parent=parent)
+        classroom = create_classroom_with_student(self.teacher, child)
+        course = Course.objects.create(
+            title="Parent Course",
+            classroom=classroom,
+            teacher=self.teacher,
+            is_published=True,
+        )
+        lesson = Lesson.objects.create(
+            course=course,
+            title="Parent Lesson",
+            lesson_type="text",
+            is_published=True,
+        )
+
+        self.client.force_authenticate(parent)
+        complete_response = self.client.post(f"/api/v1/lessons/{lesson.id}/complete/")
+        progress_response = self.client.post(
+            f"/api/v1/lessons/{lesson.id}/update_progress/",
+            {"progress_percentage": 30},
+            format="json",
+        )
+
+        self.assertEqual(complete_response.status_code, 403)
+        self.assertEqual(progress_response.status_code, 403)

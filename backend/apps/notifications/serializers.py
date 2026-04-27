@@ -17,8 +17,12 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class NotificationCreateSerializer(serializers.ModelSerializer):
-    recipient_id = serializers.UUIDField()
+    recipient_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=False,
+    )
 
     class Meta:
         model = Notification
-        fields = ["recipient_id", "notification_type", "title", "message", "data"]
+        fields = ["recipient_ids", "notification_type", "title", "message", "data"]

@@ -82,6 +82,12 @@ class BulkNotificationCreateView(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         recipient_ids = serializer.validated_data.get("recipient_ids", [])
+        if not recipient_ids:
+            return Response(
+                {"error": "recipient_ids talab qilinadi"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         notification_type = serializer.validated_data["notification_type"]
         title = serializer.validated_data["title"]
         message = serializer.validated_data["message"]
@@ -127,14 +133,32 @@ class BroadcastNotificationView(viewsets.GenericViewSet):
             )
 
         from apps.classroom.models import Enrollment
+        from apps.classroom.models import Classroom
 
         if classroom_id:
+            if request.user.role == "teacher":
+                has_access = Classroom.objects.filter(
+                    id=classroom_id,
+                    teacher=request.user,
+                ).exists()
+                if not has_access:
+                    return Response(
+                        {"error": "Bu sinfga broadcast yuborish huquqingiz yo'q"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
             enrollments = Enrollment.objects.filter(
-                classroom_id=classroom_id, is_active=True
+                classroom_id=classroom_id,
+                is_active=True,
+                is_approved=True,
             ).select_related("student")
 
             notifications = []
+            seen_students = set()
             for enrollment in enrollments:
+                if enrollment.student_id in seen_students:
+                    continue
+                seen_students.add(enrollment.student_id)
                 notification = NotificationService.create_notification(
                     str(enrollment.student.id), notification_type, title, message, data
                 )

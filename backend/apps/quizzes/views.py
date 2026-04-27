@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -23,9 +25,24 @@ from .serializers import (
 )
 from apps.users.permissions import IsTeacher
 
+logger = logging.getLogger(__name__)
+
 
 class QuizViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        quiz_id = kwargs.get('pk')
+        logger.debug("Retrieving quiz detail for id=%s", quiz_id)
+        
+        try:
+            instance = self.get_object()
+            logger.debug("Quiz found id=%s title=%s", instance.id, instance.title)
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.exception("Quiz retrieve failed for id=%s", quiz_id)
+            raise
 
     def get_permissions(self):
         if self.action in {"create", "update", "partial_update", "destroy"}:
@@ -59,9 +76,13 @@ class QuizViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         classroom = serializer.validated_data["classroom"]
+        logger.debug("Creating quiz for classroom id=%s name=%s", classroom.id, classroom.name)
+        
         if self.request.user.role == "teacher" and classroom.teacher != self.request.user:
             raise PermissionDenied("Siz faqat o'zingizga tegishli sinf uchun test yarata olasiz")
-        serializer.save(created_by=self.request.user)
+        
+        quiz = serializer.save(created_by=self.request.user)
+        logger.info("Quiz created id=%s by user=%s", quiz.id, self.request.user.id)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -444,9 +465,29 @@ class QuestionViewSet(viewsets.ModelViewSet):
         return QuestionSerializer
 
     def perform_create(self, serializer):
-        quiz_id = self.request.data.get("quiz_id")
-        quiz = get_object_or_404(Quiz, id=quiz_id, created_by=self.request.user)
+        quiz_data = self.request.data.get("quiz")
+        logger.debug("Creating question with quiz=%s", quiz_data)
+        
+        if not quiz_data:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"quiz": "Bu maydon talab qilinadi"})
+        
+        # Handle both UUID string and integer formats
+        try:
+            if isinstance(quiz_data, str):
+                quiz = get_object_or_404(Quiz, id=quiz_data, created_by=self.request.user)
+            else:
+                # If it's an integer, convert to string and try UUID lookup
+                quiz = get_object_or_404(Quiz, id=str(quiz_data), created_by=self.request.user)
+            
+            logger.debug("Question target quiz found id=%s", quiz.id)
+        except (ValueError, Quiz.DoesNotExist) as e:
+            logger.warning("Question create quiz lookup failed quiz=%s error=%s", quiz_data, e)
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"quiz": "Noto'g'ri quiz ID yoki ruxsat yo'q"})
+        
         serializer.save(quiz=quiz)
+        logger.info("Question created for quiz id=%s by user=%s", quiz.id, self.request.user.id)
 
     def perform_update(self, serializer):
         question = self.get_object()

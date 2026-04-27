@@ -152,6 +152,8 @@ REST_FRAMEWORK = {
         "anon": "100/day",
         "user": "1000/day",
         "quiz_submit": "30/hour",
+        "child_search": "30/hour",
+        "child_link": "10/hour",
     },
 }
 
