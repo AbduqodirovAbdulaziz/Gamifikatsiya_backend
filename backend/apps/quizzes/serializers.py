@@ -85,9 +85,13 @@ class QuestionCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         choices_data = validated_data.pop("choices", [])
-        # Remove quiz from validated_data as it's handled in the view
-        validated_data.pop("quiz", None)
-        question = Question.objects.create(**validated_data)
+        # `quiz` may come from serializer.save(quiz=...) in the view.
+        # Keep model instances and only drop raw string input to avoid NOT NULL quiz_id errors.
+        quiz_value = validated_data.pop("quiz", None)
+        question_kwargs = dict(validated_data)
+        if isinstance(quiz_value, Quiz):
+            question_kwargs["quiz"] = quiz_value
+        question = Question.objects.create(**question_kwargs)
         for choice_data in choices_data:
             AnswerChoice.objects.create(question=question, **choice_data)
         return question

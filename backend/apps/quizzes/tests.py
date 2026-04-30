@@ -92,6 +92,27 @@ class QuizApiRegressionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("choices", response.data)
 
+    def test_question_create_sets_quiz_from_view_save(self):
+        self.client.force_authenticate(self.teacher)
+        url = reverse("question-list")
+        payload = {
+            "quiz": str(self.quiz.id),
+            "question_text": "What is 5 + 5?",
+            "question_type": "multiple_choice",
+            "difficulty": "easy",
+            "points": 5,
+            "order": 2,
+            "choices": [
+                {"choice_text": "10", "is_correct": True, "order": 1},
+                {"choice_text": "11", "is_correct": False, "order": 2},
+            ],
+        }
+
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = Question.objects.get(question_text="What is 5 + 5?")
+        self.assertEqual(created.quiz_id, self.quiz.id)
+
     def test_submit_accepts_legacy_choice_id_payload(self):
         attempt = QuizAttempt.objects.create(
             student=self.student,
