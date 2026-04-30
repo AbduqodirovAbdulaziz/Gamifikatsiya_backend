@@ -375,11 +375,23 @@ class QuizViewSet(viewsets.ModelViewSet):
     def results(self, request, pk=None):
         quiz = self.get_object()
         user = request.user
-        attempts = (
-            quiz.attempts.filter(student=user, is_completed=True)
-            .order_by("-started_at")
-            .select_related("quiz")
-        )
+        if user.role == "teacher":
+            if quiz.created_by != user:
+                return Response(
+                    {"error": "Bu test natijalarini ko'rish huquqingiz yo'q"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            attempts = (
+                quiz.attempts.filter(is_completed=True)
+                .order_by("-started_at")
+                .select_related("quiz", "student")
+            )
+        else:
+            attempts = (
+                quiz.attempts.filter(student=user, is_completed=True)
+                .order_by("-started_at")
+                .select_related("quiz")
+            )
         serializer = QuizAttemptListSerializer(attempts, many=True)
         return Response(serializer.data)
 

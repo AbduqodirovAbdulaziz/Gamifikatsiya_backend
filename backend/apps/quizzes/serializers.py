@@ -73,6 +73,16 @@ class QuestionCreateSerializer(serializers.ModelSerializer):
             "choices",
         ]
 
+    def validate_choices(self, value):
+        if len(value) < 2:
+            raise serializers.ValidationError("Kamida 2 ta variant bo'lishi kerak")
+        correct_count = sum(1 for choice in value if choice.get("is_correct"))
+        if correct_count != 1:
+            raise serializers.ValidationError(
+                "Aynan bitta to'g'ri javob belgilanishi kerak"
+            )
+        return value
+
     def create(self, validated_data):
         choices_data = validated_data.pop("choices", [])
         # Remove quiz from validated_data as it's handled in the view
@@ -276,3 +286,17 @@ class QuizSubmitSerializer(serializers.Serializer):
         child=serializers.DictField(), allow_empty=True, max_length=100
     )
     time_taken_seconds = serializers.IntegerField(min_value=0, max_value=7200)
+
+    def validate_answers(self, value):
+        normalized = []
+        for answer in value:
+            question_id = answer.get("question_id")
+            selected_choice_id = answer.get("selected_choice_id") or answer.get("choice_id")
+            normalized.append(
+                {
+                    "question_id": question_id,
+                    "selected_choice_id": selected_choice_id,
+                    "time_taken_seconds": answer.get("time_taken_seconds", 0),
+                }
+            )
+        return normalized
